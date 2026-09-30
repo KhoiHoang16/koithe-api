@@ -1,0 +1,1 @@
+ALTER TABLE vai_tro ADD COLUMN deleted_at TIMESTAMPTZ;

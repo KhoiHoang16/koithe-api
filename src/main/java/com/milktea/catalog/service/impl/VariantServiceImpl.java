@@ -1,0 +1,14 @@
+package com.milktea.catalog.service.impl;
+import com.milktea.catalog.dto.*; import com.milktea.catalog.entity.*; import com.milktea.catalog.mapper.VariantMapper; import com.milktea.catalog.repository.*; import com.milktea.catalog.service.VariantService; import com.milktea.common.exception.BusinessException; import java.math.BigDecimal; import java.util.List; import org.springframework.http.HttpStatus; import org.springframework.stereotype.Service; import org.springframework.transaction.annotation.Transactional;
+@Service @Transactional(readOnly=true)
+public class VariantServiceImpl implements VariantService {
+    private final BienTheSanPhamRepository variants;private final SanPhamRepository products;private final VariantMapper mapper;
+    public VariantServiceImpl(BienTheSanPhamRepository variants,SanPhamRepository products,VariantMapper mapper){this.variants=variants;this.products=products;this.mapper=mapper;}
+    public List<VariantResponse> list(Long productId){requireProduct(productId);return variants.findAllBySanPhamIdAndDeletedAtIsNullOrderById(productId).stream().map(mapper::toResponse).toList();}
+    @Transactional public VariantResponse create(Long productId,VariantRequest r){SanPham p=requireProduct(productId);String size=r.kichCo().trim();if(variants.existsBySanPhamIdAndKichCoIgnoreCaseAndDeletedAtIsNull(productId,size))throw duplicate();BienTheSanPham v=new BienTheSanPham();v.setSanPham(p);v.setKichCo(size);v.setGiaBan(r.giaBan());if(r.soLuongTon()!=null){v.setSoLuongTon(r.soLuongTon());v.setConHang(r.soLuongTon().compareTo(BigDecimal.ZERO)>0);}return mapper.toResponse(variants.save(v));}
+    @Transactional public VariantResponse update(Long id,VariantRequest r){BienTheSanPham v=variant(id);String size=r.kichCo().trim();if(variants.existsBySanPhamIdAndKichCoIgnoreCaseAndIdNotAndDeletedAtIsNull(v.getSanPham().getId(),size,id))throw duplicate();v.setKichCo(size);v.setGiaBan(r.giaBan());if(r.soLuongTon()!=null){v.setSoLuongTon(r.soLuongTon());v.setConHang(r.soLuongTon().compareTo(BigDecimal.ZERO)>0);}return mapper.toResponse(v);}
+    @Transactional public VariantResponse updateStock(Long id,StockRequest r){BienTheSanPham v=variant(id);v.setSoLuongTon(r.soLuongTon());v.setConHang(r.soLuongTon().compareTo(BigDecimal.ZERO)>0);return mapper.toResponse(v);}
+    private SanPham requireProduct(Long id){return products.findById(id).filter(p->p.getDeletedAt()==null).orElseThrow(()->new BusinessException(HttpStatus.NOT_FOUND,"Không tìm thấy sản phẩm"));}
+    private BienTheSanPham variant(Long id){return variants.findById(id).filter(v->v.getDeletedAt()==null).orElseThrow(()->new BusinessException(HttpStatus.NOT_FOUND,"Không tìm thấy biến thể"));}
+    private BusinessException duplicate(){return new BusinessException(HttpStatus.CONFLICT,"Kích cỡ đã tồn tại trong sản phẩm");}
+}

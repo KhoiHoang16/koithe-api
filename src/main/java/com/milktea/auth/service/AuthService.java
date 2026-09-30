@@ -1,0 +1,1 @@
+package com.milktea.auth.service; import com.milktea.auth.dto.*; import com.milktea.security.UserPrincipal; public interface AuthService { AuthResponse login(LoginRequest request); AuthResponse register(RegisterRequest request); AuthResponse refresh(RefreshRequest request); void logout(String refreshToken); MeResponse me(UserPrincipal principal); }
