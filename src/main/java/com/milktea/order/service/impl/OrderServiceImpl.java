@@ -8,6 +8,10 @@ import com.milktea.common.exception.BusinessException;
 import com.milktea.common.response.PageResponse;
 import com.milktea.customer.entity.KhachHang;
 import com.milktea.customer.repository.KhachHangRepository;
+import com.milktea.shift.entity.CaLamViec;
+import com.milktea.shift.repository.CaLamViecRepository;
+import com.milktea.table.entity.Ban;
+import com.milktea.table.repository.BanRepository;
 import com.milktea.order.dto.*;
 import com.milktea.order.entity.*;
 import com.milktea.order.mapper.*;
@@ -25,6 +29,19 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * ARCHITECTURE NOTE:
+ * The order module depends on customer, shift, table, catalog, user, and promotion through their
+ * entities/repositories (including the voucher relation on DonHang).
+ * This is acceptable in the current Modular Monolith stage.
+ *
+ * As the business grows, consider:
+ * - Exposing public facade interfaces from the owning modules.
+ * - Using domain events for asynchronous cross-module communication.
+ * - Splitting a module into a microservice only when independent deployment is justified.
+ *
+ * No refactor is required now; keep these dependencies explicit and controlled.
+ */
 @Service
 public class OrderServiceImpl implements OrderService {
     private static final Set<String> SERVICE_TYPES = Set.of("TAI_CHO", "MANG_VE", "GIAO_HANG");
@@ -59,6 +76,8 @@ public class OrderServiceImpl implements OrderService {
 
     @Override @Transactional
     public OrderResponse create(CreateOrderRequest request, UserPrincipal principal) {
+        // TODO: [Partner] When voucher application is added to order requests, validate it through the promotion boundary
+        // and decide which voucher/discount values must be snapshotted on the order for audit and historical stability.
         validateOrderType(request.serviceType(), request.channel(), request.tableId());
         KhachHang customer = resolveCustomer(principal, request.customerId(), true);
         GioHang cart = null;

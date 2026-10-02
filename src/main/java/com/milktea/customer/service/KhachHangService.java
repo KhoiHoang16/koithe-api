@@ -1,0 +1,1 @@
+package com.milktea.customer.service;import com.milktea.customer.dto.*;import java.util.List;public interface KhachHangService{List<KhachHangResponse> findAll();KhachHangResponse findById(Long id);KhachHangResponse create(KhachHangRequest r);KhachHangResponse update(Long id,KhachHangRequest r);void delete(Long id);}

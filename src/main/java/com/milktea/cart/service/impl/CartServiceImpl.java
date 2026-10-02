@@ -22,6 +22,18 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * ARCHITECTURE NOTE:
+ * The cart module depends on customer, catalog, and user through their entities/repositories.
+ * This is acceptable in the current Modular Monolith stage.
+ *
+ * As the business grows, consider:
+ * - Exposing public facade interfaces from the owning modules.
+ * - Using domain events for asynchronous cross-module communication.
+ * - Splitting a module into a microservice only when independent deployment is justified.
+ *
+ * No refactor is required now; keep these dependencies explicit and controlled.
+ */
 @Service
 @Transactional
 public class CartServiceImpl implements CartService {

@@ -8,6 +8,10 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+/**
+ * ARCHITECTURE NOTE: Order references catalog through Topping for the ordered topping.
+ * This is accepted in the current Modular Monolith; consider a catalog facade or domain events as the boundary grows.
+ */
 @Entity @Table(name = "topping_don_hang") @Getter @Setter @NoArgsConstructor
 public class ToppingDonHang extends BaseEntity {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY) private Long id;

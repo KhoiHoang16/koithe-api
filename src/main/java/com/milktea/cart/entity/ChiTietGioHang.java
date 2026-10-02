@@ -10,6 +10,10 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+/**
+ * ARCHITECTURE NOTE: Cart references catalog through BienTheSanPham for selected products.
+ * This is accepted in the current Modular Monolith; consider a catalog facade or domain events as the boundary grows.
+ */
 @Entity @Table(name = "chi_tiet_gio_hang") @Getter @Setter @NoArgsConstructor
 public class ChiTietGioHang extends BaseEntity {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY) private Long id;

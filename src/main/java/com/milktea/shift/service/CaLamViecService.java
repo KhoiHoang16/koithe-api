@@ -1,0 +1,1 @@
+package com.milktea.shift.service; import com.milktea.shift.dto.*; import java.util.List; public interface CaLamViecService { List<CaLamViecResponse> findAll(); CaLamViecResponse findById(Long id); CaLamViecResponse create(CaLamViecRequest r); CaLamViecResponse update(Long id,CaLamViecRequest r); void delete(Long id); }

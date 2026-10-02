@@ -10,6 +10,10 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+/**
+ * ARCHITECTURE NOTE: Cart references customer through KhachHang for an authenticated customer's cart.
+ * This is accepted in the current Modular Monolith; consider a customer facade or domain events as the boundary grows.
+ */
 @Entity @Table(name = "gio_hang") @Getter @Setter @NoArgsConstructor
 public class GioHang extends BaseEntity {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY) private Long id;

@@ -1,0 +1,144 @@
+{
+  "info": {
+    "_postman_id": "2dfc3e7d-8d2f-4a10-9d2c-4e56e9c72d21",
+    "name": "MilkTea API",
+    "description": "Postman Collection cho các endpoint Auth, Catalog, Cart và Order. Tạo Environment local với baseUrl=http://localhost:8081 và accessToken để trống; token sẽ được lưu sau Login/Register/Refresh.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const url = pm.request.url.toString();",
+          "const publicAuthBootstrap = /\\/api\\/auth\\/(login|register|refresh)(?:[/?]|$)/.test(url);",
+          "const token = pm.environment.get('accessToken') || pm.collectionVariables.get('accessToken');",
+          "if (!publicAuthBootstrap && token) {",
+          "  pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + token });",
+          "} else {",
+          "  pm.request.headers.remove('Authorization');",
+          "}"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["if (pm.response.code >= 200 && pm.response.code < 300) {", "  const body = pm.response.json();", "  const data = body.data || body;", "  if (data.accessToken) pm.environment.set('accessToken', data.accessToken);", "  if (data.refreshToken) pm.environment.set('refreshToken', data.refreshToken);", "}"]}}],
+          "request": {"method": "POST", "header": [{"key": "Content-Type", "value": "application/json"}], "body": {"mode": "raw", "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"Admin@123\"\n}", "options": {"raw": {"language": "json"}}}, "url": {"raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "auth", "login"]}}
+        },
+        {
+          "name": "Register",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["if (pm.response.code >= 200 && pm.response.code < 300) {", "  const body = pm.response.json();", "  const data = body.data || body;", "  if (data.accessToken) pm.environment.set('accessToken', data.accessToken);", "  if (data.refreshToken) pm.environment.set('refreshToken', data.refreshToken);", "}"]}}],
+          "request": {"method": "POST", "header": [{"key": "Content-Type", "value": "application/json"}], "body": {"mode": "raw", "raw": "{\n  \"username\": \"partner.customer\",\n  \"password\": \"ChangeMe123!\",\n  \"fullName\": \"Khách hàng mẫu\",\n  \"phone\": \"0900000001\"\n}", "options": {"raw": {"language": "json"}}}, "url": {"raw": "{{baseUrl}}/api/auth/register", "host": ["{{baseUrl}}"], "path": ["api", "auth", "register"]}}
+        },
+        {
+          "name": "Refresh token",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["if (pm.response.code >= 200 && pm.response.code < 300) {", "  const body = pm.response.json();", "  const data = body.data || body;", "  if (data.accessToken) pm.environment.set('accessToken', data.accessToken);", "  if (data.refreshToken) pm.environment.set('refreshToken', data.refreshToken);", "}"]}}],
+          "request": {"method": "POST", "header": [{"key": "Content-Type", "value": "application/json"}], "body": {"mode": "raw", "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}", "options": {"raw": {"language": "json"}}}, "url": {"raw": "{{baseUrl}}/api/auth/refresh", "host": ["{{baseUrl}}"], "path": ["api", "auth", "refresh"]}}
+        },
+        {
+          "name": "Logout",
+          "request": {"method": "POST", "header": [{"key": "Content-Type", "value": "application/json"}], "body": {"mode": "raw", "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}", "options": {"raw": {"language": "json"}}}, "url": {"raw": "{{baseUrl}}/api/auth/logout", "host": ["{{baseUrl}}"], "path": ["api", "auth", "logout"]}}
+        },
+        {
+          "name": "Current user (me)",
+          "request": {"method": "GET", "header": [], "description": "Không có request body; cần accessToken.", "url": {"raw": "{{baseUrl}}/api/auth/me", "host": ["{{baseUrl}}"], "path": ["api", "auth", "me"]}}
+        }
+      ]
+    },
+    {
+      "name": "Catalog",
+      "item": [
+        {
+          "name": "List categories",
+          "request": {"method": "GET", "header": [], "description": "Không có request body.", "url": {"raw": "{{baseUrl}}/api/categories", "host": ["{{baseUrl}}"], "path": ["api", "categories"]}}
+        },
+        {
+          "name": "Create category",
+          "request": {"method": "POST", "header": [{"key": "Content-Type", "value": "application/json"}], "body": {"mode": "raw", "raw": "{\n  \"tenDanhMuc\": \"Trà sữa\"\n}", "options": {"raw": {"language": "json"}}}, "url": {"raw": "{{baseUrl}}/api/categories", "host": ["{{baseUrl}}"], "path": ["api", "categories"]}}
+        },
+        {
+          "name": "List products",
+          "request": {"method": "GET", "header": [], "description": "Không có request body. Có thể thêm query params categoryId, keyword, page, size.", "url": {"raw": "{{baseUrl}}/api/products?page=0&size=20", "host": ["{{baseUrl}}"], "path": ["api", "products"], "query": [{"key": "page", "value": "0"}, {"key": "size", "value": "20"}]}}
+        },
+        {
+          "name": "List product variants",
+          "request": {"method": "GET", "header": [], "description": "Không có request body.", "url": {"raw": "{{baseUrl}}/api/products/{{productId}}/variants", "host": ["{{baseUrl}}"], "path": ["api", "products", "{{productId}}", "variants"]}}
+        },
+        {
+          "name": "List toppings",
+          "request": {"method": "GET", "header": [], "description": "Không có request body.", "url": {"raw": "{{baseUrl}}/api/toppings", "host": ["{{baseUrl}}"], "path": ["api", "toppings"]}}
+        },
+        {
+          "name": "Create product",
+          "request": {"method": "POST", "header": [{"key": "Content-Type", "value": "application/json"}], "body": {"mode": "raw", "raw": "{\n  \"maDanhMuc\": {{categoryId}},\n  \"tenSanPham\": \"Trà sữa truyền thống\",\n  \"moTa\": \"Sản phẩm mẫu\"\n}", "options": {"raw": {"language": "json"}}}, "url": {"raw": "{{baseUrl}}/api/products", "host": ["{{baseUrl}}"], "path": ["api", "products"]}}
+        }
+      ]
+    },
+    {
+      "name": "Cart",
+      "item": [
+        {
+          "name": "Add cart item",
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["const cartToken = pm.response.headers.get('X-Cart-Token');", "if (cartToken) pm.environment.set('cartToken', cartToken);"]}}],
+          "request": {"method": "POST", "header": [{"key": "Content-Type", "value": "application/json"}, {"key": "X-Cart-Token", "value": "{{cartToken}}", "disabled": true}], "body": {"mode": "raw", "raw": "{\n  \"variantId\": {{variantId}},\n  \"quantity\": 1,\n  \"sugarLevel\": \"100%\",\n  \"iceLevel\": \"100%\",\n  \"note\": \"Ít ngọt\",\n  \"toppings\": [\n    {\n      \"toppingId\": {{toppingId}},\n      \"quantity\": 1\n    }\n  ]\n}", "options": {"raw": {"language": "json"}}}, "url": {"raw": "{{baseUrl}}/api/carts/items", "host": ["{{baseUrl}}"], "path": ["api", "carts", "items"]}}
+        },
+        {
+          "name": "Get current cart",
+          "request": {"method": "GET", "header": [{"key": "X-Cart-Token", "value": "{{cartToken}}", "disabled": true}], "description": "Không có request body. Bật header X-Cart-Token nếu đang dùng guest cart.", "url": {"raw": "{{baseUrl}}/api/carts/current", "host": ["{{baseUrl}}"], "path": ["api", "carts", "current"]}}
+        },
+        {
+          "name": "Update cart item",
+          "request": {"method": "PATCH", "header": [{"key": "Content-Type", "value": "application/json"}, {"key": "X-Cart-Token", "value": "{{cartToken}}", "disabled": true}], "body": {"mode": "raw", "raw": "{\n  \"quantity\": 2,\n  \"sugarLevel\": \"50%\",\n  \"iceLevel\": \"50%\"\n}", "options": {"raw": {"language": "json"}}}, "url": {"raw": "{{baseUrl}}/api/carts/items/{{cartItemId}}", "host": ["{{baseUrl}}"], "path": ["api", "carts", "items", "{{cartItemId}}"]}}
+        },
+        {
+          "name": "Delete cart item",
+          "request": {"method": "DELETE", "header": [{"key": "X-Cart-Token", "value": "{{cartToken}}", "disabled": true}], "description": "Không có request body. Bật header X-Cart-Token nếu đang dùng guest cart.", "url": {"raw": "{{baseUrl}}/api/carts/items/{{cartItemId}}", "host": ["{{baseUrl}}"], "path": ["api", "carts", "items", "{{cartItemId}}"]}}
+        }
+      ]
+    },
+    {
+      "name": "Order",
+      "item": [
+        {
+          "name": "Create order from cart",
+          "request": {"method": "POST", "header": [{"key": "Content-Type", "value": "application/json"}], "body": {"mode": "raw", "raw": "{\n  \"cartToken\": \"{{cartToken}}\",\n  \"serviceType\": \"MANG_VE\",\n  \"channel\": \"TAI_QUAY_POS\"\n}", "options": {"raw": {"language": "json"}}}, "url": {"raw": "{{baseUrl}}/api/orders", "host": ["{{baseUrl}}"], "path": ["api", "orders"]}}
+        },
+        {
+          "name": "Get order by ID",
+          "request": {"method": "GET", "header": [], "description": "Không có request body; cần quyền truy cập đơn hàng tương ứng.", "url": {"raw": "{{baseUrl}}/api/orders/{{orderId}}", "host": ["{{baseUrl}}"], "path": ["api", "orders", "{{orderId}}"]}}
+        },
+        {
+          "name": "List my orders",
+          "request": {"method": "GET", "header": [], "description": "Không có request body; cần role CUSTOMER.", "url": {"raw": "{{baseUrl}}/api/orders/my?page=0&size=20", "host": ["{{baseUrl}}"], "path": ["api", "orders", "my"], "query": [{"key": "page", "value": "0"}, {"key": "size", "value": "20"}]}}
+        },
+        {
+          "name": "Update order status",
+          "request": {"method": "PATCH", "header": [{"key": "Content-Type", "value": "application/json"}], "body": {"mode": "raw", "raw": "{\n  \"status\": \"DANG_PHA_CHE\"\n}", "options": {"raw": {"language": "json"}}}, "url": {"raw": "{{baseUrl}}/api/orders/{{orderId}}/status", "host": ["{{baseUrl}}"], "path": ["api", "orders", "{{orderId}}", "status"]}}
+        },
+        {
+          "name": "Cancel order",
+          "request": {"method": "POST", "header": [], "description": "Không có request body; cần quyền hủy đơn hàng tương ứng.", "url": {"raw": "{{baseUrl}}/api/orders/{{orderId}}/cancel", "host": ["{{baseUrl}}"], "path": ["api", "orders", "{{orderId}}", "cancel"]}}
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {"key": "baseUrl", "value": "http://localhost:8081", "type": "string"},
+    {"key": "accessToken", "value": "", "type": "string"},
+    {"key": "refreshToken", "value": "", "type": "string"},
+    {"key": "cartToken", "value": "", "type": "string"},
+    {"key": "categoryId", "value": "1", "type": "string"},
+    {"key": "productId", "value": "1", "type": "string"},
+    {"key": "variantId", "value": "1", "type": "string"},
+    {"key": "toppingId", "value": "1", "type": "string"},
+    {"key": "cartItemId", "value": "1", "type": "string"},
+    {"key": "orderId", "value": "1", "type": "string"}
+  ]
+}

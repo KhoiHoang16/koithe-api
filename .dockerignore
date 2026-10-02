@@ -1,0 +1,6 @@
+.git
+.m2
+target
+docker-build.stdout.log
+docker-build.stderr.log
+.env
