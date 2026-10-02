@@ -1,11 +1,12 @@
 # KoiThe API
 
-Backend REST API for a milk-tea ordering and management system.
+Backend REST API cho hệ thống POS và đặt hàng đa kênh MilkTea. 
+
 
 ## Tech stack
 
 | Area | Technology |
-| --- | --- |
+|---|---|
 | Language & runtime | Java 21 |
 | Framework | Spring Boot 3.3.12 |
 | Build tool | Maven |
@@ -20,39 +21,33 @@ Backend REST API for a milk-tea ordering and management system.
 
 ## Project structure
 
-```text
-.
-├── .github/                    # GitHub workflows and configuration
-├── src/
-│   ├── main/
-│   │   ├── java/com/milktea/
-│   │   │   ├── auth/           # Authentication and JWT endpoints
-│   │   │   ├── cart/           # Shopping-cart domain
-│   │   │   ├── catalog/        # Products, categories, variants, toppings
-│   │   │   ├── common/         # Shared responses, exceptions, auditing
-│   │   │   ├── config/         # Security and OpenAPI configuration
-│   │   │   ├── customer/       # Customer domain
-│   │   │   ├── health/         # Health-check endpoint
-│   │   │   ├── order/          # Orders, tables, and shifts
-│   │   │   ├── security/       # JWT filter and user details service
-│   │   │   ├── user/           # Users and roles
-│   │   │   └── MilkTeaApplication.java
-│   │   └── resources/
-│   │       ├── db/migration/   # Flyway SQL migrations
-│   │       └── application*.yml
-│   └── test/java/              # Unit and integration tests
-├── .env.example                # Local environment-variable template
-├── docker-compose.yml          # PostgreSQL, Redis, and backend services
-├── Dockerfile                  # Multi-stage backend image build
-└── pom.xml                     # Maven dependencies and build configuration
-```
+    .
+    ├── docs/                       # Partner guides, API collection, architecture notes
+    ├── src/main/java/com/milktea/
+    │   ├── auth/                   # Login, register, refresh, logout
+    │   ├── cart/                   # Cart and cart items
+    │   ├── catalog/                # Categories, products, variants, toppings
+    │   ├── common/                 # Shared responses, exceptions, audit base
+    │   ├── config/                 # Security and OpenAPI configuration
+    │   ├── customer/               # Customer profile / loyalty scaffold
+    │   ├── health/                 # Health endpoint
+    │   ├── inventory/              # Suppliers and purchase orders
+    │   ├── order/                  # POS/omnichannel orders and order lines
+    │   ├── payment/                # Transactions and gateway adapters
+    │   ├── promotion/              # Campaigns, discount rules, vouchers
+    │   ├── report/                 # Summary report scaffold
+    │   ├── security/               # JWT filter and user principal
+    │   ├── shift/                  # Cashier shift scaffold
+    │   ├── table/                  # Table and QR scaffold
+    │   ├── user/                   # Users, roles, repositories
+    │   └── MilkTeaApplication.java
+    ├── src/main/resources/db/migration/ # Flyway schema/seed/index migrations (V1–V5)
+    ├── src/test/java/              # Existing unit/controller tests (coverage is partial)
+    ├── .env.example                # Local environment-variable template
+    ├── docker-compose.yml          # PostgreSQL, Redis, backend services
+    ├── Dockerfile                  # Backend container image
+    └── pom.xml                     # Maven dependencies and build
 
-## Local development
 
-1. Copy `.env.example` to `.env` and update local values as needed.
-2. Start the stack with `docker compose up --build`.
-3. The API is exposed on `http://localhost:8081` by default.
 
-## Git hygiene
 
-Do not commit `docs/`, environment files, Maven build output, local Maven cache, IDE files, or any `*.log` file (including Docker build and compose logs).
