@@ -51,3 +51,9 @@ Backend REST API cho hệ thống POS và đặt hàng đa kênh MilkTea.
 
 
 
+
+## Tài liệu liên quan
+
+| File | Nội dung |
+|---|---|
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Quy tắc tạo nhánh, commit, review và Pull Request |
