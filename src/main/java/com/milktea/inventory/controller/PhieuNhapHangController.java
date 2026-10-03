@@ -22,15 +22,19 @@ public class PhieuNhapHangController {
     public PhieuNhapHangController(PhieuNhapHangService service) { this.service = service; }
 
     @GetMapping
-    @Operation(summary = "Lấy danh sách phiếu nhập hàng theo bộ lọc")
+    @Operation(summary = "GET /api/purchase-orders?from=&to=&supplierId= - Lấy danh sách phiếu nhập hàng")
     public ApiResponse<PageResponse<PhieuNhapHangResponse>> getAll(
             @RequestParam(required = false) Long supplierId,
             @RequestParam(required = false) Instant fromDate,
             @RequestParam(required = false) Instant toDate,
+            @RequestParam(required = false) Instant from,
+            @RequestParam(required = false) Instant to,
             @RequestParam(required = false) String trangThai,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        return ApiResponse.success(service.getAll(supplierId, fromDate, toDate, trangThai, page, size));
+        Instant effectiveFrom = from != null ? from : fromDate;
+        Instant effectiveTo = to != null ? to : toDate;
+        return ApiResponse.success(service.getAll(supplierId, effectiveFrom, effectiveTo, trangThai, page, size));
     }
 
     @GetMapping("/{id}")
@@ -42,7 +46,7 @@ public class PhieuNhapHangController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
-    @Operation(summary = "Tạo phiếu nhập hàng kèm danh sách mặt hàng")
+    @Operation(summary = "POST /api/purchase-orders - Tạo phiếu nhập hàng kèm danh sách mặt hàng")
     public ApiResponse<PhieuNhapHangResponse> create(@Valid @RequestBody PhieuNhapHangRequest request) {
         return ApiResponse.success(service.create(request));
     }
@@ -55,9 +59,9 @@ public class PhieuNhapHangController {
         return ApiResponse.success(service.update(id, request));
     }
 
-    @PatchMapping("/{id}/approve")
+    @RequestMapping(value = "/{id}/approve", method = {RequestMethod.POST, RequestMethod.PATCH})
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
-    @Operation(summary = "Duyệt phiếu nhập và ghi nhận nhập kho")
+    @Operation(summary = "POST /api/purchase-orders/{id}/approve (hỗ trợ cả PATCH) - Duyệt phiếu nhập và cập nhật tồn kho")
     public ApiResponse<PhieuNhapHangResponse> approve(@PathVariable Long id) {
         return ApiResponse.success(service.approve(id));
     }
