@@ -22,7 +22,7 @@ public class PhieuNhapHangController {
     public PhieuNhapHangController(PhieuNhapHangService service) { this.service = service; }
 
     @GetMapping
-    @Operation(summary = "GET /api/purchase-orders?from=&to=&supplierId= - Lấy danh sách phiếu nhập hàng")
+    @Operation(summary = "GET /api/purchase-orders - Danh sách phiếu nhập hàng (lọc theo from, to, supplierId)")
     public ApiResponse<PageResponse<PhieuNhapHangResponse>> getAll(
             @RequestParam(required = false) Long supplierId,
             @RequestParam(required = false) Instant fromDate,
@@ -37,6 +37,12 @@ public class PhieuNhapHangController {
         return ApiResponse.success(service.getAll(supplierId, effectiveFrom, effectiveTo, trangThai, page, size));
     }
 
+    @GetMapping("/{id}")
+    @Operation(summary = "GET /api/purchase-orders/{id} - Lấy chi tiết phiếu nhập hàng")
+    public ApiResponse<PhieuNhapHangResponse> getById(@PathVariable Long id) {
+        return ApiResponse.success(service.getById(id));
+    }
+
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
@@ -45,10 +51,26 @@ public class PhieuNhapHangController {
         return ApiResponse.success(service.create(request));
     }
 
+    @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    @Operation(summary = "PUT /api/purchase-orders/{id} - Cập nhật phiếu nhập hàng")
+    public ApiResponse<PhieuNhapHangResponse> update(@PathVariable Long id,
+            @Valid @RequestBody PhieuNhapHangRequest request) {
+        return ApiResponse.success(service.update(id, request));
+    }
+
     @RequestMapping(value = "/{id}/approve", method = {RequestMethod.POST, RequestMethod.PATCH})
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
-    @Operation(summary = "POST /api/purchase-orders/{id}/approve (hỗ trợ cả PATCH) - Duyệt phiếu nhập và cập nhật tồn kho")
+    @Operation(summary = "POST /api/purchase-orders/{id}/approve - Duyệt phiếu nhập và cập nhật tồn kho (hỗ trợ cả PATCH)")
     public ApiResponse<PhieuNhapHangResponse> approve(@PathVariable Long id) {
         return ApiResponse.success(service.approve(id));
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    @Operation(summary = "DELETE /api/purchase-orders/{id} - Hủy phiếu nhập chưa được duyệt")
+    public ApiResponse<Void> delete(@PathVariable Long id) {
+        service.delete(id);
+        return ApiResponse.success(null);
     }
 }
