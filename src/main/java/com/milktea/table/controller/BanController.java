@@ -22,14 +22,20 @@ public class BanController {
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER','CASHIER')")
-    @Operation(summary = "List tables")
+    @Operation(summary = "GET /api/tables - Danh sách bàn")
     public ApiResponse<List<BanResponse>> list() {
         return ApiResponse.success(service.findAll());
     }
 
+    @GetMapping("/qr/{token}")
+    @Operation(summary = "GET /api/tables/qr/{token} - Public, cho khách quét QR")
+    public ApiResponse<BanResponse> getByQrToken(@PathVariable String token) {
+        return ApiResponse.success(service.findByQrToken(token));
+    }
+
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER','CASHIER')")
-    @Operation(summary = "Get table")
+    @Operation(summary = "GET /api/tables/{id} - Chi tiết bàn")
     public ApiResponse<BanResponse> get(@PathVariable Long id) {
         return ApiResponse.success(service.findById(id));
     }
@@ -37,21 +43,28 @@ public class BanController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
-    @Operation(summary = "Create table")
+    @Operation(summary = "POST /api/tables - Tạo bàn mới")
     public ApiResponse<BanResponse> create(@RequestBody BanRequest r) {
         return ApiResponse.success(service.create(r));
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER','CASHIER')")
-    @Operation(summary = "Update table")
+    @Operation(summary = "PUT /api/tables/{id} - Cập nhật thông tin bàn")
     public ApiResponse<BanResponse> update(@PathVariable Long id, @RequestBody BanRequest r) {
         return ApiResponse.success(service.update(id, r));
     }
 
+    @PatchMapping("/{id}/status")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','CASHIER')")
+    @Operation(summary = "PATCH /api/tables/{id}/status - Đổi trạng thái bàn")
+    public ApiResponse<BanResponse> updateStatus(@PathVariable Long id, @RequestBody BanRequest r) {
+        return ApiResponse.success(service.updateStatus(id, r.trangThai()));
+    }
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
-    @Operation(summary = "Delete table")
+    @Operation(summary = "DELETE /api/tables/{id} - Xóa bàn")
     public ApiResponse<Void> delete(@PathVariable Long id) {
         service.delete(id);
         return ApiResponse.success(null);

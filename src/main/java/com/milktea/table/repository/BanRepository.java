@@ -10,6 +10,8 @@ public interface BanRepository extends JpaRepository<Ban, Long> {
 
     List<Ban> findAllByDeletedAtIsNullOrderBySoBanAsc();
 
+    Optional<Ban> findByMaQrTokenAndDeletedAtIsNull(String maQrToken);
+
     boolean existsBySoBanAndDeletedAtIsNull(String soBan);
 
     boolean existsBySoBanAndIdNotAndDeletedAtIsNull(String soBan, Long id);
