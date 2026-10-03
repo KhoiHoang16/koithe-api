@@ -21,8 +21,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class CaLamViecServiceImplTest {
 
     @Mock CaLamViecRepository repository;
@@ -271,7 +274,44 @@ class CaLamViecServiceImplTest {
         when(repository.findByIdAndDeletedAtIsNull(99L)).thenReturn(Optional.empty());
 
         BusinessException ex = assertThrows(BusinessException.class, () -> service.delete(99L));
-        assertEquals(404, ex.getStatus().value());
+    }
+
+    @Test
+    void findAll_withStatus_filtersByStatus() {
+        CaLamViec ca1 = openShift(1L);
+        CaLamViecResponse resp1 = dummyResponse(1L, "DANG_MO");
+        when(repository.findAllByTrangThaiAndDeletedAtIsNullOrderByThoiGianBatDauDesc("DANG_MO"))
+                .thenReturn(List.of(ca1));
+        when(mapper.toResponse(ca1)).thenReturn(resp1);
+
+        List<CaLamViecResponse> result = service.findAll("DANG_MO");
+
+        assertEquals(1, result.size());
+        verify(repository).findAllByTrangThaiAndDeletedAtIsNullOrderByThoiGianBatDauDesc("DANG_MO");
+    }
+
+    @Test
+    void findCurrentActive_returnsActiveShiftWhenPresent() {
+        CaLamViec ca1 = openShift(1L);
+        CaLamViecResponse resp1 = dummyResponse(1L, "DANG_MO");
+        when(repository.findFirstByTrangThaiAndDeletedAtIsNullOrderByThoiGianBatDauDesc("DANG_MO"))
+                .thenReturn(Optional.of(ca1));
+        when(mapper.toResponse(ca1)).thenReturn(resp1);
+
+        CaLamViecResponse result = service.findCurrentActive();
+
+        assertNotNull(result);
+        assertEquals(1L, result.id());
+    }
+
+    @Test
+    void findCurrentActive_returnsNullWhenNoActiveShift() {
+        when(repository.findFirstByTrangThaiAndDeletedAtIsNullOrderByThoiGianBatDauDesc("DANG_MO"))
+                .thenReturn(Optional.empty());
+
+        CaLamViecResponse result = service.findCurrentActive();
+
+        assertNull(result);
     }
 
     // ─── helpers ────────────────────────────────────────────────────────

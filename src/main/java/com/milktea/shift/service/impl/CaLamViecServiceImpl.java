@@ -26,7 +26,10 @@ public class CaLamViecServiceImpl implements CaLamViecService {
     private final NguoiDungRepository users;
     private final CaLamViecMapper mapper;
 
-    public CaLamViecServiceImpl(CaLamViecRepository repository, NguoiDungRepository users, CaLamViecMapper mapper) {
+    public CaLamViecServiceImpl(
+            CaLamViecRepository repository,
+            NguoiDungRepository users,
+            CaLamViecMapper mapper) {
         this.repository = repository;
         this.users = users;
         this.mapper = mapper;
@@ -35,12 +38,38 @@ public class CaLamViecServiceImpl implements CaLamViecService {
     @Override
     public List<CaLamViecResponse> findAll() {
         return repository.findAllByDeletedAtIsNullOrderByThoiGianBatDauDesc()
-                .stream().map(mapper::toResponse).toList();
+                .stream().map(this::toReportResponse).toList();
+    }
+
+    @Override
+    public List<CaLamViecResponse> findAll(String status) {
+        if (status == null || status.isBlank()) {
+            return findAll();
+        }
+        return repository.findAllByTrangThaiAndDeletedAtIsNullOrderByThoiGianBatDauDesc(status.trim())
+                .stream().map(this::toReportResponse).toList();
     }
 
     @Override
     public CaLamViecResponse findById(Long id) {
-        return mapper.toResponse(shift(id));
+        return toReportResponse(shift(id));
+    }
+
+    @Override
+    public CaLamViecResponse findCurrentActive() {
+        return repository.findFirstByTrangThaiAndDeletedAtIsNullOrderByThoiGianBatDauDesc(DANG_MO)
+                .map(this::toReportResponse)
+                .orElse(null);
+    }
+
+    @Override
+    public CaLamViecResponse findCurrentActive(Long thuNganId) {
+        if (thuNganId == null) {
+            return findCurrentActive();
+        }
+        return repository.findFirstByThuNganIdAndTrangThaiAndDeletedAtIsNullOrderByThoiGianBatDauDesc(thuNganId, DANG_MO)
+                .map(this::toReportResponse)
+                .orElseGet(this::findCurrentActive);
     }
 
     @Override
@@ -54,24 +83,25 @@ public class CaLamViecServiceImpl implements CaLamViecService {
                 .filter(NguoiDung::isDangHoatDong)
                 .orElseThrow(() -> error(HttpStatus.NOT_FOUND, "Không tìm thấy thu ngân hoặc tài khoản đã bị vô hiệu hóa"));
 
-        // Không cho phép mở đồng thời nhiều ca cho cùng thu ngân
+        // Ràng buộc: 1 thu ngân chỉ có 1 ca DANG_MO
         if (repository.existsByThuNganIdAndTrangThaiAndDeletedAtIsNull(r.maThuNgan(), DANG_MO)) {
             throw error(HttpStatus.CONFLICT, "Thu ngân đang có ca làm việc chưa đóng");
         }
 
-        // Validate tiền đầu ca không âm
-        BigDecimal tienDauCa = r.tienDauCa() != null ? r.tienDauCa() : BigDecimal.ZERO;
-        if (tienDauCa.compareTo(BigDecimal.ZERO) < 0) {
+        // Validate tiền đầu ca >= 0
+        if (r.tienDauCa() != null && r.tienDauCa().compareTo(BigDecimal.ZERO) < 0) {
             throw error(HttpStatus.BAD_REQUEST, "Tiền đầu ca không được âm");
         }
 
         CaLamViec ca = new CaLamViec();
         ca.setThuNgan(thuNgan);
         ca.setThoiGianBatDau(r.thoiGianBatDau() != null ? r.thoiGianBatDau() : Instant.now());
-        ca.setTienDauCa(tienDauCa);
+        ca.setTienDauCa(r.tienDauCa() != null ? r.tienDauCa() : BigDecimal.ZERO);
+        ca.setTienKetCa(BigDecimal.ZERO);
         ca.setTrangThai(DANG_MO);
 
-        return mapper.toResponse(repository.save(ca));
+        CaLamViec saved = repository.save(ca);
+        return toReportResponse(saved);
     }
 
     @Override
@@ -79,33 +109,33 @@ public class CaLamViecServiceImpl implements CaLamViecService {
     public CaLamViecResponse update(Long id, CaLamViecRequest r) {
         CaLamViec ca = shift(id);
 
-        // Không cho phép sửa ca đã đóng
-        if (DA_DONG.equals(ca.getTrangThai())) {
-            throw error(HttpStatus.BAD_REQUEST, "Không thể chỉnh sửa ca đã đóng");
-        }
-
-        // Xử lý đóng ca
-        if (DA_DONG.equals(r.trangThai())) {
-            if (r.tienKetCa() == null) {
-                throw error(HttpStatus.BAD_REQUEST, "Tiền kết ca không được để trống khi đóng ca");
+        // Đóng ca: chuyển từ DANG_MO sang DA_DONG
+        if (DA_DONG.equals(r.trangThai()) || r.tienKetCa() != null) {
+            if (DA_DONG.equals(ca.getTrangThai())) {
+                throw error(HttpStatus.BAD_REQUEST, "Ca làm việc đã được đóng trước đó");
             }
-            if (r.tienKetCa().compareTo(BigDecimal.ZERO) < 0) {
-                throw error(HttpStatus.BAD_REQUEST, "Tiền kết ca không được âm");
+            if (r.tienKetCa() == null || r.tienKetCa().compareTo(BigDecimal.ZERO) < 0) {
+                throw error(HttpStatus.BAD_REQUEST, "Tiền kết ca không hợp lệ");
             }
             ca.setTienKetCa(r.tienKetCa());
             ca.setThoiGianKetThuc(r.thoiGianKetThuc() != null ? r.thoiGianKetThuc() : Instant.now());
             ca.setTrangThai(DA_DONG);
-        } else {
-            // Cập nhật thông tin ca đang mở (vd: sửa tiền đầu ca)
-            if (r.tienDauCa() != null) {
-                if (r.tienDauCa().compareTo(BigDecimal.ZERO) < 0) {
-                    throw error(HttpStatus.BAD_REQUEST, "Tiền đầu ca không được âm");
-                }
-                ca.setTienDauCa(r.tienDauCa());
-            }
+            return toReportResponse(ca);
         }
 
-        return mapper.toResponse(ca);
+        // Cập nhật thông tin khi ca vẫn đang mở
+        if (DA_DONG.equals(ca.getTrangThai())) {
+            throw error(HttpStatus.BAD_REQUEST, "Không thể chỉnh sửa ca đã đóng");
+        }
+
+        if (r.tienDauCa() != null) {
+            if (r.tienDauCa().compareTo(BigDecimal.ZERO) < 0) {
+                throw error(HttpStatus.BAD_REQUEST, "Tiền đầu ca không được âm");
+            }
+            ca.setTienDauCa(r.tienDauCa());
+        }
+
+        return toReportResponse(ca);
     }
 
     @Override
@@ -115,11 +145,47 @@ public class CaLamViecServiceImpl implements CaLamViecService {
         ca.markDeleted();
     }
 
-    // ─── private helpers ────────────────────────────────────────────────
-
     private CaLamViec shift(Long id) {
         return repository.findByIdAndDeletedAtIsNull(id)
                 .orElseThrow(() -> error(HttpStatus.NOT_FOUND, "Không tìm thấy ca làm việc"));
+    }
+
+    private CaLamViecResponse toReportResponse(CaLamViec ca) {
+        CaLamViecResponse base = mapper.toResponse(ca);
+        if (base == null) {
+            return null;
+        }
+
+        BigDecimal tongDoanhThu = BigDecimal.ZERO;
+        Long soDon = 0L;
+        if (ca.getId() != null) {
+            BigDecimal rev = repository.sumRevenueByCaId(ca.getId());
+            if (rev != null) {
+                tongDoanhThu = rev;
+            }
+            Long cnt = repository.countOrdersByCaId(ca.getId());
+            if (cnt != null) {
+                soDon = cnt;
+            }
+        }
+
+        BigDecimal tienMatDuKien = ca.getTienDauCa() != null ? ca.getTienDauCa().add(tongDoanhThu) : tongDoanhThu;
+        BigDecimal chenhLech = null;
+        if (ca.getTienKetCa() != null && ca.getTienKetCa().compareTo(BigDecimal.ZERO) > 0) {
+            chenhLech = ca.getTienKetCa().subtract(tienMatDuKien);
+        }
+
+        return new CaLamViecResponse(
+                base.id(),
+                base.thoiGianBatDau(),
+                base.thoiGianKetThuc(),
+                base.tienDauCa(),
+                base.tienKetCa(),
+                base.trangThai(),
+                tongDoanhThu,
+                soDon,
+                tienMatDuKien,
+                chenhLech);
     }
 
     private BusinessException error(HttpStatus status, String message) {
