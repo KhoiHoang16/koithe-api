@@ -9,6 +9,8 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.time.Instant;
+import com.milktea.security.UserPrincipal;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -47,8 +49,22 @@ public class PhieuNhapHangController {
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     @Operation(summary = "POST /api/purchase-orders - Tạo phiếu nhập hàng kèm danh sách mặt hàng")
-    public ApiResponse<PhieuNhapHangResponse> create(@Valid @RequestBody PhieuNhapHangRequest request) {
-        return ApiResponse.success(service.create(request));
+    public ApiResponse<PhieuNhapHangResponse> create(
+            @Valid @RequestBody PhieuNhapHangRequest request,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        PhieuNhapHangRequest req = request;
+        if (req.maNguoiNhap() == null && principal != null) {
+            req = new PhieuNhapHangRequest(
+                    req.maPhieuNhap(),
+                    req.maNhaCungCap(),
+                    principal.id(),
+                    req.tongTien(),
+                    req.ghiChu(),
+                    req.trangThai(),
+                    req.ngayNhap(),
+                    req.chiTiet());
+        }
+        return ApiResponse.success(service.create(req));
     }
 
     @PutMapping("/{id}")
