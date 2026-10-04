@@ -29,6 +29,16 @@ public class CaLamViecController {
         return ApiResponse.success(service.findAll(status));
     }
 
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','CASHIER')")
+    @Operation(summary = "POST /api/shifts - Mở ca làm việc (nhập tiền đầu ca)")
+    public ApiResponse<CaLamViecResponse> create(
+            @RequestBody CaLamViecRequest r,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return open(r, principal);
+    }
+
     @PostMapping("/open")
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER','CASHIER')")
@@ -62,6 +72,15 @@ public class CaLamViecController {
     @Operation(summary = "GET /api/shifts/{id} - Xem chi tiết ca làm việc")
     public ApiResponse<CaLamViecResponse> get(@PathVariable Long id) {
         return ApiResponse.success(service.findById(id));
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','CASHIER')")
+    @Operation(summary = "PUT /api/shifts/{id} - Cập nhật / Đóng ca làm việc (đối soát tiền mặt)")
+    public ApiResponse<CaLamViecResponse> update(
+            @PathVariable Long id,
+            @RequestBody CaLamViecRequest r) {
+        return ApiResponse.success(service.update(id, r));
     }
 
     @PostMapping("/{id}/close")
