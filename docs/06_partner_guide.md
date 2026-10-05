@@ -1,5 +1,30 @@
 # Hướng dẫn làm việc dành cho partner
 
+## Chạy backend bằng Docker hoặc IDE
+
+Datasource dùng `DB_HOST`/`DB_PORT`, mặc định là `postgres:5432`; Redis mặc định `redis:6379`. Docker Compose cung cấp các địa chỉ trong mạng Compose, còn cấu hình VS Code **MilkTea Backend (Local IDE)** override DB/Redis về `localhost`.
+
+**Docker:**
+
+```bash
+docker compose up -d --build backend
+```
+
+**VS Code IDE:** khởi động PostgreSQL và Redis, sau đó chọn cấu hình **MilkTea Backend (Local IDE)** trong Run and Debug và nhấn F5:
+
+```bash
+docker compose up -d postgres redis
+```
+
+IDE kết nối PostgreSQL tại `localhost:5433`, Redis tại `localhost:6380` và chạy backend tại `http://localhost:8080`. Health endpoint: `GET /api/health`.
+
+**Maven terminal:**
+
+```bash
+mvn spring-boot:run -Dspring-boot.run.jvmArguments="-DDB_HOST=localhost -DDB_PORT=5433 -DREDIS_HOST=localhost -DREDIS_PORT=6380 -Duser.timezone=Asia/Ho_Chi_Minh"
+```
+
+Không commit `.env` hoặc secret vào Git.
 Tài liệu này bổ sung cho Swagger và [hướng dẫn chạy local](huong-dan-chay-local-va-deploy.md). Hãy kiểm tra DTO/controller hiện tại trước khi gửi request hoặc viết test, vì contract cụ thể có thể khác ví dụ minh họa.
 
 ## 1. Trace request từ Swagger xuống database

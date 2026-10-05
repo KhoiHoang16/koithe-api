@@ -1,14 +1,16 @@
 {
-    "configurations": [
-        {
-            "type": "java",
-            "name": "Spring Boot-MilkTeaApplication<milktea-backend>",
-            "request": "launch",
-            "cwd": "${workspaceFolder}",
-            "mainClass": "com.milktea.MilkTeaApplication",
-            "projectName": "milktea-backend",
-            "args": "",
-            "envFile": "${workspaceFolder}/.env"
-        }
-    ]
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "java",
+      "name": "MilkTea Backend (Local IDE)",
+      "request": "launch",
+      "cwd": "${workspaceFolder}",
+      "mainClass": "com.milktea.MilkTeaApplication",
+      "projectName": "milktea-backend",
+      "args": "",
+      "envFile": "${workspaceFolder}/.env",
+      "vmArgs": "-DDB_HOST=localhost -DDB_PORT=5433 -DREDIS_HOST=localhost -DREDIS_PORT=6380 -Duser.timezone=Asia/Ho_Chi_Minh"
+    }
+  ]
 }

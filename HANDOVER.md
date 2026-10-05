@@ -25,6 +25,8 @@ Trong PowerShell có thể dùng `Copy-Item .env.example .env`. Kiểm tra trạ
 
 Theo cấu hình mặc định, backend trong Docker được publish tại `http://localhost:8081`, PostgreSQL tại `localhost:5433` và Redis tại `localhost:6380`. Swagger UI: [http://localhost:8081/swagger-ui.html](http://localhost:8081/swagger-ui.html). Nếu chạy backend trực tiếp trên máy bằng Maven, kiểm tra profile/cấu hình local trong `application-dev.yml`; cổng ứng dụng khi chạy trực tiếp có thể khác cổng Docker.
 
+
+Để chạy/debug bằng VS Code, chạy `docker compose up -d postgres redis`, sau đó chọn **MilkTea Backend (Local IDE)** trong Run and Debug. Cấu hình `.vscode/launch.json` trỏ database/Redis tới `localhost:5433`/`localhost:6380`; backend chạy ở `http://localhost:8080`. Cấu hình Docker vẫn kết nối qua `postgres:5432` và `redis:6379`. Xem `docs/06_partner_guide.md` để biết thêm.
 Tài khoản seed local: `admin` / `Admin@123`. Đã xác minh ngày 2026-10-01 trên database/Compose local: user tồn tại và đang hoạt động, hash có prefix BCrypt `$2a$`, API login trả HTTP 200 và access token. Đây chỉ là credential môi trường phát triển; không dùng lại trong staging/production.
 
 ## Module partner tiếp tục

@@ -1,8 +1,4 @@
 spring:
-  datasource:
-    url: ${DB_URL:jdbc:postgresql://postgres:5432/milktea}
-    username: ${DB_USERNAME:milktea}
-    password: ${DB_PASSWORD:change-me}
   data:
     redis:
       host: ${REDIS_HOST:redis}

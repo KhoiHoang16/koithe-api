@@ -52,6 +52,15 @@ Backend REST API cho hệ thống POS và đặt hàng đa kênh MilkTea.
 
 
 
+## Ports và chạy IDE
+
+| Service | Docker (host) | IDE local |
+|---|---:|---:|
+| Backend | 8081 | 8080 |
+| PostgreSQL | 5433 | 5433 |
+| Redis | 6380 | 6380 |
+
+Chạy `docker compose up -d postgres redis`, rồi chọn **MilkTea Backend (Local IDE)** trong VS Code Run and Debug để debug. Docker backend dùng `postgres:5432` và `redis:6379` bên trong mạng Compose. Xem [hướng dẫn partner](docs/06_partner_guide.md) để biết thêm.
 ## Tài liệu liên quan
 
 | File | Nội dung |
