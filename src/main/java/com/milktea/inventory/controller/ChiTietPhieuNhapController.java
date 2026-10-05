@@ -21,7 +21,7 @@ public class ChiTietPhieuNhapController {
     public ChiTietPhieuNhapController(ChiTietPhieuNhapService service) { this.service = service; }
 
     @GetMapping
-    @Operation(summary = "Lấy danh sách dòng chi tiết theo mã phiếu nhập")
+    @Operation(summary = "GET /api/purchase-order-lines - Lấy danh sách dòng chi tiết theo mã phiếu nhập")
     public ApiResponse<PageResponse<ChiTietPhieuNhapResponse>> getAllByMaPhieuNhap(
             @RequestParam Long maPhieuNhap,
             @RequestParam(defaultValue = "0") int page,
@@ -30,7 +30,7 @@ public class ChiTietPhieuNhapController {
     }
 
     @GetMapping("/{id}")
-    @Operation(summary = "Lấy chi tiết một dòng phiếu nhập")
+    @Operation(summary = "GET /api/purchase-order-lines/{id} - Lấy chi tiết một dòng phiếu nhập")
     public ApiResponse<ChiTietPhieuNhapResponse> getById(@PathVariable Long id) {
         return ApiResponse.success(service.getById(id));
     }
@@ -38,14 +38,14 @@ public class ChiTietPhieuNhapController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
-    @Operation(summary = "Thêm dòng vào phiếu nhập chưa duyệt")
+    @Operation(summary = "POST /api/purchase-order-lines - Thêm dòng vào phiếu nhập chưa duyệt")
     public ApiResponse<ChiTietPhieuNhapResponse> create(@Valid @RequestBody ChiTietPhieuNhapRequest request) {
         return ApiResponse.success(service.create(request));
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
-    @Operation(summary = "Cập nhật dòng của phiếu nhập chưa duyệt")
+    @Operation(summary = "PUT /api/purchase-order-lines/{id} - Cập nhật dòng của phiếu nhập chưa duyệt")
     public ApiResponse<ChiTietPhieuNhapResponse> update(@PathVariable Long id,
             @Valid @RequestBody ChiTietPhieuNhapRequest request) {
         return ApiResponse.success(service.update(id, request));
@@ -53,7 +53,7 @@ public class ChiTietPhieuNhapController {
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
-    @Operation(summary = "Xóa dòng khỏi phiếu nhập chưa duyệt")
+    @Operation(summary = "DELETE /api/purchase-order-lines/{id} - Xóa dòng khỏi phiếu nhập chưa duyệt")
     public ApiResponse<Void> delete(@PathVariable Long id) {
         service.delete(id);
         return ApiResponse.success(null);
