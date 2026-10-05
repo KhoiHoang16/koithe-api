@@ -8,9 +8,13 @@ public interface BanService {
 
     BanResponse findById(Long id);
 
+    BanResponse findByQrToken(String token);
+
     BanResponse create(BanRequest r);
 
     BanResponse update(Long id, BanRequest r);
+
+    BanResponse updateStatus(Long id, String status);
 
     void delete(Long id);
 }
