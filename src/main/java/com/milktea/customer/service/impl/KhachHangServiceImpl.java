@@ -1,28 +1,90 @@
 package com.milktea.customer.service.impl;
 
+import com.milktea.common.exception.BusinessException;
 import com.milktea.customer.dto.*;
+import com.milktea.customer.entity.KhachHang;
+import com.milktea.customer.mapper.KhachHangMapper;
+import com.milktea.customer.repository.KhachHangRepository;
 import com.milktea.customer.service.KhachHangService;
 import java.util.List;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class KhachHangServiceImpl implements KhachHangService {
-    // TODO: [Partner] Implement business logic.
-    // Yêu cầu nghiệp vụ: CRUD khách hàng; cộng điểm từ đơn đã thanh toán/hoàn thành đúng một lần; nâng hạng theo ngưỡng
-    // được Product Owner xác nhận; hỗ trợ lịch sử đổi/trừ điểm nếu có chính sách hoàn đơn.
-    // Validation rules: so_dien_thoai duy nhất; validate email; không nhận mat_khau_ma_hoa hoặc token_lam_moi từ response;
-    // lưu mật khẩu bằng PasswordEncoder và không ghi token nhạy cảm vào log.
-    // Các giá trị hợp lệ: hang_thanh_vien = DONG, BAC, VANG, KIM_CUONG; da_xac_thuc = true/false.
-    // Liên quan: Order (điểm phát sinh từ đơn), Auth/User (định danh và xác thực khách hàng).
-    // Idempotency: cùng một đơn không được cộng điểm nhiều lần khi retry.
 
-    public List<KhachHangResponse> findAll() { throw todo(); }
-    public KhachHangResponse findById(Long id) { throw todo(); }
-    public KhachHangResponse create(KhachHangRequest r) { throw todo(); }
-    public KhachHangResponse update(Long id, KhachHangRequest r) { throw todo(); }
-    public void delete(Long id) { throw todo(); }
+    private final KhachHangRepository repo;
+    private final KhachHangMapper mapper;
+    private final PasswordEncoder encoder;
 
-    private UnsupportedOperationException todo() {
-        return new UnsupportedOperationException("TODO: Implement business logic");
+    public KhachHangServiceImpl(KhachHangRepository repo, KhachHangMapper mapper, PasswordEncoder encoder) {
+        this.repo = repo;
+        this.mapper = mapper;
+        this.encoder = encoder;
+    }
+
+    @Override
+    public List<KhachHangResponse> findAll(String phone) {
+        if (phone != null && !phone.isBlank()) {
+            return repo.findBySoDienThoaiAndDeletedAtIsNull(phone.trim())
+                    .map(mapper::toResponse)
+                    .map(List::of)
+                    .orElse(List.of());
+        }
+        return repo.findAllByDeletedAtIsNull().stream()
+                .map(mapper::toResponse)
+                .toList();
+    }
+
+    @Override
+    public KhachHangResponse findById(Long id) {
+        return mapper.toResponse(requireCustomer(id));
+    }
+
+    @Override
+    public KhachHangResponse findByPhone(String phone) {
+        KhachHang customer = repo.findBySoDienThoaiAndDeletedAtIsNull(phone)
+                .orElseThrow(() -> error(HttpStatus.NOT_FOUND, "Không tìm thấy khách hàng với số điện thoại: " + phone));
+        return mapper.toResponse(customer);
+    }
+
+    @Override
+    @Transactional
+    public KhachHangResponse create(KhachHangCreateRequest request) {
+        if (repo.existsBySoDienThoaiAndDeletedAtIsNull(request.soDienThoai())) {
+            throw error(HttpStatus.CONFLICT, "Số điện thoại đã được đăng ký");
+        }
+
+        KhachHang customer = mapper.toEntity(request);
+        if (request.matKhau() != null && !request.matKhau().isBlank()) {
+            customer.setMatKhauMaHoa(encoder.encode(request.matKhau()));
+        }
+        return mapper.toResponse(repo.save(customer));
+    }
+
+    @Override
+    @Transactional
+    public KhachHangResponse update(Long id, KhachHangUpdateRequest request) {
+        KhachHang customer = requireCustomer(id);
+        mapper.updateEntity(request, customer);
+        return mapper.toResponse(repo.save(customer));
+    }
+
+    @Override
+    @Transactional
+    public void delete(Long id) {
+        KhachHang customer = requireCustomer(id);
+        customer.markDeleted();
+    }
+
+    private KhachHang requireCustomer(Long id) {
+        return repo.findByIdAndDeletedAtIsNull(id)
+                .orElseThrow(() -> error(HttpStatus.NOT_FOUND, "Không tìm thấy khách hàng"));
+    }
+
+    private BusinessException error(HttpStatus status, String message) {
+        return new BusinessException(status, message);
     }
 }
