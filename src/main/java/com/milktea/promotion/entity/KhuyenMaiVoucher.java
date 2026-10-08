@@ -19,8 +19,9 @@ public class KhuyenMaiVoucher extends BaseEntity {
     private ChuongTrinhKhuyenMai chuongTrinh;
     @Column(name = "ma_code", nullable = false, unique = true)
     private String maCode;
+    @Enumerated(EnumType.STRING)
     @Column(name = "loai_giam_gia", nullable = false)
-    private String loaiGiamGia;
+    private LoaiGiamGia loaiGiamGia;
     @Column(name = "gia_tri_giam", nullable = false, precision = 12, scale = 2)
     private BigDecimal giaTriGiam;
     @Column(name = "muc_giam_toi_da", precision = 12, scale = 2)

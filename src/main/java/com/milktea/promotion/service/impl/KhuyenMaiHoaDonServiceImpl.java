@@ -1,52 +1,119 @@
 package com.milktea.promotion.service.impl;
 
-import com.milktea.promotion.dto.*;
-import com.milktea.promotion.service.KhuyenMaiHoaDonService;
+import com.milktea.common.exception.BusinessException;
 import com.milktea.common.response.PageResponse;
+import com.milktea.promotion.dto.KhuyenMaiHoaDonRequest;
+import com.milktea.promotion.dto.KhuyenMaiHoaDonResponse;
+import com.milktea.promotion.entity.ChuongTrinhKhuyenMai;
+import com.milktea.promotion.entity.KhuyenMaiHoaDon;
+import com.milktea.promotion.entity.LoaiGiamGia;
+import com.milktea.promotion.mapper.KhuyenMaiHoaDonMapper;
+import com.milktea.promotion.repository.ChuongTrinhKhuyenMaiRepository;
+import com.milktea.promotion.repository.KhuyenMaiHoaDonRepository;
+import com.milktea.promotion.service.KhuyenMaiHoaDonService;
+import java.math.BigDecimal;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-/**
- * ARCHITECTURE NOTE:
- * The promotion module has a catalog dependency through its product-promotion flow; invoice
- * discounts remain in this module and are combined at the promotion boundary.
- * This is acceptable in the current Modular Monolith stage.
- *
- * As the business grows, consider:
- * - Exposing public catalog/promotion facades for cross-module reads.
- * - Using domain events for asynchronous cross-module communication.
- * - Splitting a module into a microservice only when independent deployment is justified.
- *
- * No refactor is required now; keep these dependencies explicit and controlled.
- */
 @Service
+@Transactional
 public class KhuyenMaiHoaDonServiceImpl implements KhuyenMaiHoaDonService {
-    // TODO: [Partner] Implement business logic.
-    // Yêu cầu nghiệp vụ: CRUD phân trang mức giảm hóa đơn; kiểm tra ngưỡng hóa đơn tối thiểu và áp dụng mức trần giảm
-    // khi tính discount; phối hợp thứ tự với khuyến mãi sản phẩm và voucher.
-    // Validation rules: don_hang_toi_thieu >= 0; gia_tri_giam > 0; muc_giam_toi_da nếu có phải >= 0; chương trình tồn tại.
-    // Các giá trị hợp lệ: loai_giam_gia = PHAN_TRAM, TIEN_CO_DINH.
-    // Liên quan: ChuongTrinhKhuyenMai và Order; chỉ tính trên số tiền đủ điều kiện theo quy tắc bán hàng.
+
+    private final KhuyenMaiHoaDonRepository repository;
+    private final KhuyenMaiHoaDonMapper mapper;
+    private final ChuongTrinhKhuyenMaiRepository chuongTrinhRepository;
+
+    public KhuyenMaiHoaDonServiceImpl(
+            KhuyenMaiHoaDonRepository repository,
+            KhuyenMaiHoaDonMapper mapper,
+            ChuongTrinhKhuyenMaiRepository chuongTrinhRepository) {
+        this.repository = repository;
+        this.mapper = mapper;
+        this.chuongTrinhRepository = chuongTrinhRepository;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public PageResponse<KhuyenMaiHoaDonResponse> getAll(int page, int size) {
-        throw todo();
+        if (page < 0 || size <= 0) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "Tham số phân trang không hợp lệ (page >= 0, size > 0)");
+        }
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        Page<KhuyenMaiHoaDonResponse> responsePage = repository.findByDeletedAtIsNull(pageable)
+                .map(mapper::toResponse);
+        return PageResponse.from(responsePage);
     }
 
+    @Override
+    @Transactional(readOnly = true)
     public KhuyenMaiHoaDonResponse getById(Long id) {
-        throw todo();
+        KhuyenMaiHoaDon entity = repository.findByIdAndDeletedAtIsNull(id)
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "Không tìm thấy khuyến mãi hóa đơn với ID: " + id));
+        return mapper.toResponse(entity);
     }
 
+    @Override
     public KhuyenMaiHoaDonResponse create(KhuyenMaiHoaDonRequest r) {
-        throw todo();
+        validateRequest(r);
+
+        ChuongTrinhKhuyenMai chuongTrinh = chuongTrinhRepository.findByIdAndDeletedAtIsNull(r.maChuongTrinh())
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "Không tìm thấy chương trình khuyến mãi với ID: " + r.maChuongTrinh()));
+
+        KhuyenMaiHoaDon entity = mapper.toEntity(r);
+        entity.setChuongTrinh(chuongTrinh);
+
+        KhuyenMaiHoaDon saved = repository.save(entity);
+        return mapper.toResponse(saved);
     }
 
+    @Override
     public KhuyenMaiHoaDonResponse update(Long id, KhuyenMaiHoaDonRequest r) {
-        throw todo();
+        validateRequest(r);
+
+        KhuyenMaiHoaDon entity = repository.findByIdAndDeletedAtIsNull(id)
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "Không tìm thấy khuyến mãi hóa đơn với ID: " + id));
+
+        ChuongTrinhKhuyenMai chuongTrinh = chuongTrinhRepository.findByIdAndDeletedAtIsNull(r.maChuongTrinh())
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "Không tìm thấy chương trình khuyến mãi với ID: " + r.maChuongTrinh()));
+
+        mapper.updateEntity(entity, r);
+        entity.setChuongTrinh(chuongTrinh);
+
+        KhuyenMaiHoaDon saved = repository.save(entity);
+        return mapper.toResponse(saved);
     }
 
+    @Override
     public void delete(Long id) {
-        throw todo();
+        KhuyenMaiHoaDon entity = repository.findByIdAndDeletedAtIsNull(id)
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "Không tìm thấy khuyến mãi hóa đơn với ID: " + id));
+        entity.markDeleted();
+        repository.save(entity);
     }
 
-    private UnsupportedOperationException todo() {
-        return new UnsupportedOperationException("TODO: Implement business logic");
+    private void validateRequest(KhuyenMaiHoaDonRequest r) {
+        if (r.maChuongTrinh() == null) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "Mã chương trình không được để trống");
+        }
+        if (r.donHangToiThieu() == null || r.donHangToiThieu().compareTo(BigDecimal.ZERO) < 0) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "Đơn hàng tối thiểu không được âm");
+        }
+        if (r.loaiGiamGia() == null) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "Loại giảm giá không được để trống");
+        }
+        if (r.giaTriGiam() == null || r.giaTriGiam().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "Giá trị giảm phải lớn hơn 0");
+        }
+        if (r.loaiGiamGia() == LoaiGiamGia.PHAN_TRAM && r.giaTriGiam().compareTo(BigDecimal.valueOf(100)) > 0) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "Khuyến mãi theo phần trăm không được vượt quá 100%");
+        }
+        if (r.mucGiamToiDa() != null && r.mucGiamToiDa().compareTo(BigDecimal.ZERO) < 0) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "Mức giảm tối đa không được âm");
+        }
     }
 }

@@ -19,8 +19,9 @@ public class KhuyenMaiHoaDon extends BaseEntity {
     private ChuongTrinhKhuyenMai chuongTrinh;
     @Column(name = "don_hang_toi_thieu", nullable = false, precision = 12, scale = 2)
     private BigDecimal donHangToiThieu;
+    @Enumerated(EnumType.STRING)
     @Column(name = "loai_giam_gia", nullable = false)
-    private String loaiGiamGia;
+    private LoaiGiamGia loaiGiamGia;
     @Column(name = "gia_tri_giam", nullable = false, precision = 12, scale = 2)
     private BigDecimal giaTriGiam;
     @Column(name = "muc_giam_toi_da", precision = 12, scale = 2)

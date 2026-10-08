@@ -6,6 +6,7 @@ import com.milktea.promotion.dto.ChuongTrinhKhuyenMaiRequest;
 import com.milktea.promotion.dto.ChuongTrinhKhuyenMaiResponse;
 import com.milktea.promotion.service.ChuongTrinhKhuyenMaiService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -15,15 +16,19 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/promotion-programs")
 @Tag(name = "Promotion Program", description = "Quản lý chương trình khuyến mãi")
+@SecurityRequirement(name = "bearerAuth")
 public class ChuongTrinhKhuyenMaiController {
     private final ChuongTrinhKhuyenMaiService service;
 
-    public ChuongTrinhKhuyenMaiController(ChuongTrinhKhuyenMaiService service) { this.service = service; }
+    public ChuongTrinhKhuyenMaiController(ChuongTrinhKhuyenMaiService service) {
+        this.service = service;
+    }
 
     @GetMapping
     @Operation(summary = "Lấy danh sách chương trình khuyến mãi")
     public ApiResponse<PageResponse<ChuongTrinhKhuyenMaiResponse>> getAll(
-            @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
         return ApiResponse.success(service.getAll(page, size));
     }
 
@@ -44,7 +49,8 @@ public class ChuongTrinhKhuyenMaiController {
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     @Operation(summary = "Cập nhật chương trình khuyến mãi")
-    public ApiResponse<ChuongTrinhKhuyenMaiResponse> update(@PathVariable Long id,
+    public ApiResponse<ChuongTrinhKhuyenMaiResponse> update(
+            @PathVariable Long id,
             @Valid @RequestBody ChuongTrinhKhuyenMaiRequest request) {
         return ApiResponse.success(service.update(id, request));
     }
