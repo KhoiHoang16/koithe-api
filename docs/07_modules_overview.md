@@ -104,7 +104,7 @@ Có thêm GET/PUT/DELETE cho category/product/topping và PUT variant theo contr
 **6. Phụ thuộc:** Cart/Catalog; tích hợp tiếp Payment, Shift, Table, Customer, Promotion, Report.
 **Bắt đầu từ đâu:** `OrderServiceImpl`; đọc transaction và logic tồn kho.
 
-### 🟡 Payment — Trạng thái: Cần implement
+### 🟢 Payment — Trạng thái: Hoàn thành luồng chính
 
 **1. Bài toán:** Ghi nhận tiền khách trả cho đơn qua tiền mặt hoặc cổng điện tử. Đơn chỉ được xác nhận đã trả sau khi có kết quả hợp lệ.
 **2. Entity/Table:** `GiaoDichThanhToan`/`giao_dich_thanh_toan` lưu đơn, tiền, phương thức và trạng thái.

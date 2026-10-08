@@ -1,12 +1,12 @@
 spring:
   datasource:
-    url: ${DB_URL:jdbc:postgresql://postgres:5432/milktea}
+    url: ${DB_URL:jdbc:postgresql://localhost:5433/milktea}
     username: ${DB_USERNAME:milktea}
     password: ${DB_PASSWORD:change-me}
   data:
     redis:
-      host: ${REDIS_HOST:redis}
-      port: ${REDIS_PORT:6379}
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6380}
   jpa:
     properties:
       hibernate:
@@ -14,3 +14,6 @@ spring:
 logging:
   level:
     org.hibernate.SQL: debug
+server:
+  port: ${SERVER_PORT:8088}
+
