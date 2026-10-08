@@ -105,11 +105,11 @@
 **Mục tiêu:** Cho quản lý xem doanh thu và hoạt động theo thời gian từ dữ liệu đơn/giao dịch.
 
 **Việc cần làm:**
-- [ ] Implement `ReportService` theo TODO trong ServiceImpl.
-- [ ] Chốt định nghĩa doanh thu, timezone và bộ lọc với PO.
-- [ ] Viết Unit Test cho Service.
-- [ ] Test API qua Swagger.
-- [ ] Chạy `mvn clean verify` PASS.
+- [x] Implement `ReportService` theo TODO trong ServiceImpl.
+- [x] Chốt định nghĩa doanh thu, timezone và bộ lọc với PO.
+- [x] Viết Unit Test cho Service.
+- [x] Test API qua Swagger.
+- [x] Chạy `mvn clean verify` PASS.
 
 **Gợi ý bắt đầu:** Mở `src/main/java/com/milktea/report/service/impl/ReportServiceImpl.java` và đọc TODO ở dòng 21.
 

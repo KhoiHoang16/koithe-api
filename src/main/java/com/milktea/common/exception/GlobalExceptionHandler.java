@@ -26,6 +26,10 @@ public class GlobalExceptionHandler {
     ResponseEntity<ApiResponse<Void>> optimisticLock(ObjectOptimisticLockingFailureException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(new ApiResponse<>(409, "Dữ liệu tồn kho vừa được cập nhật; vui lòng thử lại", null, Instant.now()));
     }
+    @ExceptionHandler({org.springframework.security.access.AccessDeniedException.class, org.springframework.security.authorization.AuthorizationDeniedException.class})
+    ResponseEntity<ApiResponse<Void>> accessDenied(Exception ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new ApiResponse<>(403, "Bạn không có quyền truy cập tính năng này", null, Instant.now()));
+    }
     @ExceptionHandler(Exception.class)
     ResponseEntity<ApiResponse<Void>> unexpected(Exception ex) {
         return ResponseEntity.internalServerError().body(new ApiResponse<>(500, "Lỗi hệ thống", null, Instant.now()));

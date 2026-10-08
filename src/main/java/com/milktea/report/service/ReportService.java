@@ -1,5 +1,8 @@
 package com.milktea.report.service;
 
+import com.milktea.report.dto.ReportSummaryResponse;
+import java.time.LocalDate;
+
 public interface ReportService {
-    Object summary();
+    ReportSummaryResponse getSummary(LocalDate from, LocalDate to, Integer top);
 }

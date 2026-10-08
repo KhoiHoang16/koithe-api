@@ -205,15 +205,15 @@ Controller cũng khai báo GET/PUT/DELETE `/{id}` cho các nhóm.
 **6. Phụ thuộc:** Catalog, Auth/User, Report.
 **Bắt đầu từ đâu:** `PhieuNhapHangServiceImpl`; không sửa migration đã chạy.
 
-### 🟡 Report — Trạng thái: Cần implement
-
+### 🟢 Report — Trạng thái: Hoàn thành luồng chính
+ 
 **1. Bài toán:** Giúp quản lý xem tổng hợp bán hàng theo thời gian, thay vì cộng đơn thủ công. Báo cáo đọc dữ liệu nghiệp vụ, không tạo giao dịch.
-**2. Entity/Table:** Không có entity riêng; đọc `DonHang`/`don_hang`, `GiaoDichThanhToan`/`giao_dich_thanh_toan`, `CaLamViec`/`ca_lam_viec`.
-**3. API chính (controller hiện trả null):**
+**2. Entity/Table:** Không có entity riêng; đọc `DonHang`/`don_hang`, `GiaoDichThanhToan`/`giao_dich_thanh_toan`, `ChiTietDonHang`/`chi_tiet_don_hang`.
+**3. API chính:**
 
 | Method | Endpoint | Mô tả |
 |---|---|---|
-| GET | `/api/reports` | Summary; query filter chưa định nghĩa |
+| GET | `/api/reports` | Tổng hợp báo cáo kinh doanh (doanh thu, đơn hàng, số ly, kênh bán, phương thức thanh toán, top món) |
 
 **4. Rules:** chỉ cộng trạng thái hợp lệ; ví dụ 50,000₫ + 80,000₫ = 130,000₫ trước refund; timezone/biên ngày nhất quán; định nghĩa doanh thu và quyền xem cần PO.
 **5. Thứ tự:** chốt KPI → query theo ngày/trạng thái → breakdown theo ca/kênh.
