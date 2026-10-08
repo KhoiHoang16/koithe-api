@@ -88,11 +88,11 @@
 **Mục tiêu:** Ghi nhận giao dịch và chỉ xác nhận đơn đã thanh toán sau khi kết quả được xác minh.
 
 **Việc cần làm:**
-- [ ] Implement `GiaoDichThanhToanService` theo TODO trong ServiceImpl.
-- [ ] Làm callback idempotent, xác minh chữ ký/nguồn gửi; tích hợp sandbox gateway theo phạm vi được giao.
-- [ ] Viết Unit Test cho Service.
-- [ ] Test API qua Swagger.
-- [ ] Chạy `mvn clean verify` PASS.
+- [x] Implement `GiaoDichThanhToanService` theo TODO trong ServiceImpl.
+- [x] Làm callback idempotent, xác minh chữ ký/nguồn gửi; tích hợp sandbox gateway theo phạm vi được giao.
+- [x] Viết Unit Test cho Service.
+- [x] Test API qua Swagger.
+- [x] Chạy `mvn clean verify` PASS.
 
 **Gợi ý bắt đầu:** Mở `src/main/java/com/milktea/payment/service/impl/GiaoDichThanhToanServiceImpl.java` và đọc TODO ở dòng 30 (điều phối gateway ở dòng 57).
 

@@ -19,7 +19,25 @@ public class SecurityConfig {
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http, JwtFilter jwtFilter) throws Exception {
         return http.csrf(csrf -> csrf.disable()).sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .authorizeHttpRequests(a -> a.requestMatchers("/api/health", "/api/auth/login", "/api/auth/register", "/api/auth/refresh", "/api/auth/logout", "/api/carts/**", "/actuator/health/**", "/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()
+            .authorizeHttpRequests(a -> a
+                // 1. Các endpoint công khai hệ thống, xác thực auth, giỏ hàng, tài liệu Swagger
+                .requestMatchers(
+                    "/api/health", "/api/auth/login", "/api/auth/register",
+                    "/api/auth/refresh", "/api/auth/logout", "/api/carts/**",
+                    "/actuator/health/**", "/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**"
+                ).permitAll()
+
+                // 2. Callback & Webhook cổng thanh toán (VNPay & MoMo):
+                // BẮT BUỘC mở permitAll vì máy chủ đối tác (MoMo/VNPay) và trình duyệt redirect
+                // không mang theo JWT Token của người dùng.
+                // Việc bảo mật chống giả mạo được đảm bảo 100% bằng Chữ ký số bí mật (Signature/Checksum).
+                .requestMatchers(
+                    "/api/payments/vnpay-return", "/api/payments/vnpay-ipn",
+                    "/api/payments/momo-return", "/api/payments/momo-ipn",
+                    "/api/payments/vietqr-webhook",
+                    "/api/payments/dev-simulate-success"
+                ).permitAll()
+
                 .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/orders").permitAll()
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/categories/**", "/api/products/**", "/api/toppings/**", "/api/tables/qr/**").permitAll()
                 .anyRequest().authenticated())

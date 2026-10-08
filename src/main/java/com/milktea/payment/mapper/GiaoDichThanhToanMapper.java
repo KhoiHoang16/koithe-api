@@ -6,6 +6,7 @@ import org.mapstruct.*;
 
 @Mapper(componentModel = "spring")
 public interface GiaoDichThanhToanMapper {
+    @Mapping(target = "maDonHang", source = "donHang.id")
     GiaoDichThanhToanResponse toResponse(GiaoDichThanhToan entity);
 
     @Mapping(target = "id", ignore = true)
