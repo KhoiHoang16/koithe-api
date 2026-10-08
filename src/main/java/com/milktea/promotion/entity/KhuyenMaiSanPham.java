@@ -28,8 +28,9 @@ public class KhuyenMaiSanPham extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "ma_danh_muc")
     private LoaiSanPham danhMuc;
+    @Enumerated(EnumType.STRING)
     @Column(name = "loai_giam_gia", nullable = false)
-    private String loaiGiamGia;
+    private LoaiGiamGia loaiGiamGia;
     @Column(name = "gia_tri_giam", nullable = false, precision = 12, scale = 2)
     private BigDecimal giaTriGiam;
 }
