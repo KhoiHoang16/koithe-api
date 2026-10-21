@@ -37,6 +37,13 @@ public class GiaoDichThanhToanController {
         return ApiResponse.success(service.create(request));
     }
 
+    @PostMapping("/guest-cash")
+    @Operation(summary = "Create a COD payment for a guest order")
+    public ApiResponse<GiaoDichThanhToanResponse> createGuestCash(
+            @Valid @RequestBody GuestCashPaymentRequest request) {
+        return ApiResponse.success(service.createGuestCash(request));
+    }
+
     @PutMapping("/{id}")
     @Operation(summary = "Update payment")
     public ApiResponse<GiaoDichThanhToanResponse> update(@PathVariable Long id,

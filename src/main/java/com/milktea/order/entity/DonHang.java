@@ -53,6 +53,14 @@ public class DonHang extends BaseEntity {
     private KhuyenMaiVoucher voucher;
     @Column(name = "loai_phuc_vu", nullable = false)
     private String loaiPhucVu;
+    @Column(name = "ten_nguoi_nhan", length = 255)
+    private String tenNguoiNhan;
+    @Column(name = "so_dien_thoai_nguoi_nhan", length = 30)
+    private String soDienThoaiNguoiNhan;
+    @Column(name = "dia_chi_giao_hang", length = 1000)
+    private String diaChiGiaoHang;
+    @Column(name = "guest_checkout_token", length = 64)
+    private String guestCheckoutToken;
     @Column(name = "tong_tien_hang", nullable = false, precision = 12, scale = 2)
     private BigDecimal tongTienHang;
     @Column(name = "so_tien_giam", nullable = false, precision = 12, scale = 2)

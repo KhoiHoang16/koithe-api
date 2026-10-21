@@ -158,6 +158,23 @@ public class GiaoDichThanhToanServiceImpl implements GiaoDichThanhToanService {
 
     @Override
     @Transactional
+    public GiaoDichThanhToanResponse createGuestCash(GuestCashPaymentRequest request) {
+        DonHang order = donHangRepository.findByIdAndDeletedAtIsNull(request.maDonHang())
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND,
+                        "Không tìm thấy đơn hàng với ID: " + request.maDonHang()));
+
+        if (order.getKhachHang() != null || order.getGuestCheckoutToken() == null
+                || !order.getGuestCheckoutToken().equals(request.cartToken())) {
+            throw new BusinessException(HttpStatus.FORBIDDEN,
+                    "Token không có quyền thanh toán đơn hàng này");
+        }
+
+        return create(new GiaoDichThanhToanRequest(
+                request.maDonHang(), "TIEN_MAT", request.soTien(), null, null, null));
+    }
+
+    @Override
+    @Transactional
     public GiaoDichThanhToanResponse handleCallback(String method, java.util.Map<String, String> callbackParams) {
         PaymentGateway gateway = gatewayFactory.getGateway(method);
         GatewayPaymentResult result = gateway.handleCallback(callbackParams);

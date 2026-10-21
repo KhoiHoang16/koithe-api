@@ -97,6 +97,7 @@ public class OrderServiceImpl implements OrderService {
         // and decide which voucher/discount values must be snapshotted on the order for
         // audit and historical stability.
         validateOrderType(request.serviceType(), request.channel(), request.tableId());
+        validateDeliveryDetails(request);
         KhachHang customer = resolveCustomer(principal, request.customerId(), true);
         GioHang cart = null;
         if (request.cartToken() != null && !request.cartToken().isBlank()) {
@@ -112,7 +113,9 @@ public class OrderServiceImpl implements OrderService {
         if (entries.isEmpty())
             throw error(HttpStatus.BAD_REQUEST, "Không thể tạo đơn từ giỏ hàng rỗng");
         DonHang order = orders.save(newOrder(request.channel(), request.serviceType(), customer, null, null,
-                request.tableId() == null ? null : table(request.tableId())));
+                request.tableId() == null ? null : table(request.tableId()), request.tenNguoiNhan(),
+                request.soDienThoaiNguoiNhan(), request.diaChiGiaoHang(),
+                principal == null ? request.cartToken() : null));
         BigDecimal total = BigDecimal.ZERO;
         for (ChiTietGioHang entry : entries) {
             List<ToppingGioHang> chosen = cartToppings.findAllByChiTietGioHangIdAndDeletedAtIsNull(entry.getId());
@@ -146,7 +149,7 @@ public class OrderServiceImpl implements OrderService {
                 : customers.findById(request.customerId())
                         .orElseThrow(() -> error(HttpStatus.NOT_FOUND, "Không tìm thấy khách hàng"));
         DonHang order = orders.save(newOrder("TAI_QUAY_POS", request.serviceType(), customer, cashier, shift,
-                request.tableId() == null ? null : table(request.tableId())));
+                request.tableId() == null ? null : table(request.tableId()), null, null, null, null));
         BigDecimal total = BigDecimal.ZERO;
         for (PosOrderItemRequest item : request.items())
             total = total.add(addSnapshotLine(order, item.variantId(), item.quantity(),
@@ -207,7 +210,7 @@ public class OrderServiceImpl implements OrderService {
     }
 
     private DonHang newOrder(String channel, String serviceType, KhachHang customer, NguoiDung cashier, CaLamViec shift,
-            Ban table) {
+            Ban table, String recipientName, String recipientPhone, String deliveryAddress, String guestCheckoutToken) {
         DonHang order = new DonHang();
         order.setMaHienThiDon(numbers.next());
         order.setKenhDatHang(channel);
@@ -216,12 +219,33 @@ public class OrderServiceImpl implements OrderService {
         order.setThuNgan(cashier);
         order.setCaLamViec(shift);
         order.setBan(table);
+        order.setTenNguoiNhan(trimToNull(recipientName));
+        order.setSoDienThoaiNguoiNhan(trimToNull(recipientPhone));
+        order.setDiaChiGiaoHang(trimToNull(deliveryAddress));
+        order.setGuestCheckoutToken(trimToNull(guestCheckoutToken));
         order.setTrangThai("CHO_XAC_NHAN");
         order.setNgayTao(Instant.now());
         order.setTongTienHang(BigDecimal.ZERO);
         order.setSoTienGiam(BigDecimal.ZERO);
         order.setTongTienThanhToan(BigDecimal.ZERO);
         return order;
+    }
+
+    private void validateDeliveryDetails(CreateOrderRequest request) {
+        if (!"GIAO_HANG".equals(request.serviceType()))
+            return;
+        if (isBlank(request.tenNguoiNhan()) || isBlank(request.soDienThoaiNguoiNhan())
+                || isBlank(request.diaChiGiaoHang()))
+            throw error(HttpStatus.BAD_REQUEST,
+                    "Đơn giao hàng cần họ tên, số điện thoại người nhận và địa chỉ giao hàng");
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
+    }
+
+    private String trimToNull(String value) {
+        return isBlank(value) ? null : value.trim();
     }
 
     private BigDecimal addSnapshotLine(DonHang order, Long variantId, Integer quantity, String sugar, String ice,
@@ -323,8 +347,9 @@ public class OrderServiceImpl implements OrderService {
         OrderResponse mapped = orderMapper.toResponse(order);
         return new OrderResponse(mapped.id(), mapped.displayCode(), mapped.status(), mapped.channel(),
                 mapped.serviceType(),
-                mapped.customerId(), mapped.cashierId(), mapped.shiftId(), mapped.tableId(), mapped.merchandiseTotal(),
-                mapped.discount(), mapped.payableTotal(), mapped.createdAt(), rendered);
+                mapped.customerId(), mapped.cashierId(), mapped.shiftId(), mapped.tableId(), mapped.tenNguoiNhan(),
+                mapped.soDienThoaiNguoiNhan(), mapped.diaChiGiaoHang(), mapped.merchandiseTotal(), mapped.discount(),
+                mapped.payableTotal(), mapped.createdAt(), rendered);
     }
 
     private DonHang order(Long id) {

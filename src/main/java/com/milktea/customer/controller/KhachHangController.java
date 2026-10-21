@@ -47,7 +47,7 @@ public class KhachHangController {
     @Operation(summary = "Update customer")
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     public ApiResponse<KhachHangResponse> update(@PathVariable Long id,
-                                                  @Valid @RequestBody KhachHangUpdateRequest request) {
+            @Valid @RequestBody KhachHangUpdateRequest request) {
         return ApiResponse.success(service.update(id, request));
     }
 

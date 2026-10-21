@@ -9,6 +9,7 @@ import org.mapstruct.MappingTarget;
 public interface ProductMapper {
     @Mapping(target = "maDanhMuc", source = "danhMuc.id")
     @Mapping(target = "tenDanhMuc", source = "danhMuc.tenDanhMuc")
+    @Mapping(target = "giaTu", ignore = true)
     ProductResponse toResponse(SanPham entity);
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "danhMuc", ignore = true)

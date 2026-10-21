@@ -11,6 +11,8 @@ public interface GiaoDichThanhToanService {
 
     GiaoDichThanhToanResponse create(GiaoDichThanhToanRequest request);
 
+    GiaoDichThanhToanResponse createGuestCash(GuestCashPaymentRequest request);
+
     GiaoDichThanhToanResponse update(Long id, GiaoDichThanhToanRequest request);
 
     void delete(Long id);

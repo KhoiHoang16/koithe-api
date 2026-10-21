@@ -14,4 +14,6 @@ public class SanPham extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "ma_danh_muc", nullable = false) private LoaiSanPham danhMuc;
     @Column(name = "ten_san_pham", nullable = false) private String tenSanPham;
     @Column(name = "mo_ta") private String moTa;
+    @Column(name = "hinh_anh", length = 2048) private String hinhAnh;
+    @Column(name = "noi_bat", nullable = false) private boolean noiBat = false;
 }

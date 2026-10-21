@@ -64,7 +64,8 @@ class OrderServiceImplTest {
         when(orderMapper.toResponse(any())).thenAnswer(call -> { DonHang order = call.getArgument(0);
             return new OrderResponse(order.getId(), order.getMaHienThiDon(), order.getTrangThai(), order.getKenhDatHang(), order.getLoaiPhucVu(),
                     null, order.getThuNgan() == null ? null : order.getThuNgan().getId(), order.getCaLamViec() == null ? null : order.getCaLamViec().getId(),
-                    order.getBan() == null ? null : order.getBan().getId(), order.getTongTienHang(), order.getSoTienGiam(), order.getTongTienThanhToan(),
+                    order.getBan() == null ? null : order.getBan().getId(), order.getTenNguoiNhan(),
+                    order.getSoDienThoaiNguoiNhan(), order.getDiaChiGiaoHang(), order.getTongTienHang(), order.getSoTienGiam(), order.getTongTienThanhToan(),
                     order.getNgayTao(), List.of()); });
         when(itemMapper.toResponse(any())).thenAnswer(call -> { ChiTietDonHang line = call.getArgument(0);
             return new OrderItemResponse(line.getId(), line.getBienThe().getId(), "Milk Tea", line.getBienThe().getKichCo(), line.getSoLuong(),
@@ -87,7 +88,8 @@ class OrderServiceImplTest {
         when(variants.findByIdAndDeletedAtIsNull(5L)).thenReturn(Optional.of(variant));
         when(toppings.findByIdAndDeletedAtIsNull(8L)).thenReturn(Optional.of(topping));
 
-        OrderResponse response = service.create(new CreateOrderRequest(token, null, "MANG_VE", "WEBSITE", null), null);
+        OrderResponse response = service.create(new CreateOrderRequest(token, null, "MANG_VE", "WEBSITE", null,
+                null, null, null), null);
 
         assertEquals("DH-2026-001", response.displayCode());
         assertEquals(new BigDecimal("96000"), response.payableTotal());
@@ -96,6 +98,33 @@ class OrderServiceImplTest {
         variant.setGiaBan(new BigDecimal("50000")); topping.setGiaBan(new BigDecimal("10000"));
         assertEquals(new BigDecimal("40000"), savedItems.getFirst().getDonGia());
         assertNotNull(cart.getDeletedAt());
+    }
+
+    @Test void storesDeliveryRecipientAndAddressOnOrder() {
+        String token = UUID.randomUUID().toString();
+        GioHang cart = new GioHang(); cart.setId(2L); cart.setTokenPhien(token);
+        BienTheSanPham variant = variant(6L, "M", "40000", "10");
+        ChiTietGioHang cartLine = new ChiTietGioHang(); cartLine.setId(12L); cartLine.setGioHang(cart);
+        cartLine.setBienThe(variant); cartLine.setSoLuong(1);
+        when(carts.findFirstByTokenPhienAndDeletedAtIsNull(token)).thenReturn(Optional.of(cart));
+        when(cartItems.findAllByGioHangIdAndDeletedAtIsNullOrderById(2L)).thenReturn(List.of(cartLine));
+        when(cartToppings.findAllByChiTietGioHangIdAndDeletedAtIsNull(12L)).thenReturn(List.of());
+        when(variants.findByIdAndDeletedAtIsNull(6L)).thenReturn(Optional.of(variant));
+
+        OrderResponse response = service.create(new CreateOrderRequest(token, null, "GIAO_HANG", "WEBSITE", null,
+                "  Nguyễn An  ", " 0901234567 ", "  123 Nguyễn Huệ  "), null);
+
+        assertEquals("Nguyễn An", response.tenNguoiNhan());
+        assertEquals("0901234567", response.soDienThoaiNguoiNhan());
+        assertEquals("123 Nguyễn Huệ", response.diaChiGiaoHang());
+    }
+
+    @Test void requiresRecipientAndAddressForDeliveryOrder() {
+        BusinessException failure = assertThrows(BusinessException.class,
+                () -> service.create(new CreateOrderRequest("cart-token", null, "GIAO_HANG", "WEBSITE", null,
+                        null, null, null), null));
+        assertEquals(400, failure.getStatus().value());
+        verifyNoInteractions(carts);
     }
 
     @Test void createsDirectPosOrderWithRequiredCashierAndOpenShift() {

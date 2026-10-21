@@ -38,6 +38,8 @@ public class SecurityConfig {
                     "/api/payments/dev-simulate-success"
                 ).permitAll()
 
+                .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/payments/guest-cash").permitAll()
+
                 .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/orders").permitAll()
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/categories/**", "/api/products/**", "/api/toppings/**", "/api/tables/qr/**").permitAll()
                 .anyRequest().authenticated())
