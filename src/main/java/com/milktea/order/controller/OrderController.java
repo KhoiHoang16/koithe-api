@@ -43,6 +43,11 @@ public class OrderController {
         return ApiResponse.success(service.list(status, channel, pageable));
     }
 
+    @GetMapping("/track")
+    public ApiResponse<OrderResponse> track(@RequestParam String code, @RequestParam String phone) {
+        return ApiResponse.success(service.track(code, phone));
+    }
+
     @GetMapping("/{id}")
     public ApiResponse<OrderResponse> get(@PathVariable Long id, @AuthenticationPrincipal UserPrincipal principal) {
         return ApiResponse.success(service.get(id, principal));

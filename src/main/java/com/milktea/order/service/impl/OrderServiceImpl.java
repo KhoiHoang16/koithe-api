@@ -209,6 +209,16 @@ public class OrderServiceImpl implements OrderService {
         return response(order);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public OrderResponse track(String code, String phone) {
+        if (isBlank(code) || isBlank(phone))
+            throw error(HttpStatus.BAD_REQUEST, "Mã đơn hàng và số điện thoại không được để trống");
+        DonHang order = orders.trackOrder(code.trim(), phone.trim())
+                .orElseThrow(() -> error(HttpStatus.NOT_FOUND, "Không tìm thấy đơn hàng với thông tin đã cung cấp"));
+        return response(order);
+    }
+
     private DonHang newOrder(String channel, String serviceType, KhachHang customer, NguoiDung cashier, CaLamViec shift,
             Ban table, String recipientName, String recipientPhone, String deliveryAddress, String guestCheckoutToken) {
         DonHang order = new DonHang();

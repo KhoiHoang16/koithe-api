@@ -13,4 +13,7 @@ public interface DonHangRepository extends JpaRepository<DonHang, Long> {
     @Query("select o from DonHang o where o.deletedAt is null and (:status is null or o.trangThai = :status) and (:channel is null or o.kenhDatHang = :channel)")
     Page<DonHang> search(@Param("status") String status, @Param("channel") String channel, Pageable pageable);
     Page<DonHang> findAllByKhachHangIdAndDeletedAtIsNull(Long customerId, Pageable pageable);
+
+    @Query("select o from DonHang o left join o.khachHang c where o.deletedAt is null and upper(trim(o.maHienThiDon)) = upper(trim(:code)) and ((o.soDienThoaiNguoiNhan is not null and trim(o.soDienThoaiNguoiNhan) = trim(:phone)) or (c.soDienThoai is not null and trim(c.soDienThoai) = trim(:phone)))")
+    Optional<DonHang> trackOrder(@Param("code") String code, @Param("phone") String phone);
 }

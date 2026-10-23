@@ -41,7 +41,7 @@ public class SecurityConfig {
                 .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/payments/guest-cash").permitAll()
 
                 .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/orders").permitAll()
-                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/categories/**", "/api/products/**", "/api/toppings/**", "/api/tables/qr/**").permitAll()
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/categories/**", "/api/products/**", "/api/toppings/**", "/api/tables/qr/**", "/api/orders/track").permitAll()
                 .anyRequest().authenticated())
             .exceptionHandling(e -> e.authenticationEntryPoint((request, response, exception) -> response.sendError(401)))
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)

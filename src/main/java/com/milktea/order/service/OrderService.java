@@ -19,4 +19,6 @@ public interface OrderService {
     OrderResponse updateStatus(Long id, String status);
 
     OrderResponse cancel(Long id, UserPrincipal principal);
+
+    OrderResponse track(String code, String phone);
 }

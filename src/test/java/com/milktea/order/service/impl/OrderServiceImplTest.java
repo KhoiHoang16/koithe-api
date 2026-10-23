@@ -166,6 +166,32 @@ class OrderServiceImplTest {
         assertEquals(400, failure.getStatus().value());
     }
 
+    @Test void tracksOrderSuccessfullyByCodeAndRecipientPhone() {
+        DonHang order = new DonHang();
+        order.setId(88L);
+        order.setMaHienThiDon("DH-2026-006");
+        order.setKenhDatHang("WEBSITE");
+        order.setLoaiPhucVu("GIAO_HANG");
+        order.setTrangThai("DA_THANH_TOAN");
+        order.setSoDienThoaiNguoiNhan("0787274247");
+        order.setTongTienHang(new BigDecimal("50000"));
+        order.setSoTienGiam(BigDecimal.ZERO);
+        order.setTongTienThanhToan(new BigDecimal("50000"));
+        when(orders.trackOrder("DH-2026-006", "0787274247")).thenReturn(Optional.of(order));
+
+        OrderResponse response = service.track(" DH-2026-006 ", " 0787274247 ");
+
+        assertNotNull(response);
+        assertEquals("DH-2026-006", response.displayCode());
+        assertEquals("0787274247", response.soDienThoaiNguoiNhan());
+    }
+
+    @Test void rejectsTrackingWhenNotFoundOrMissingParams() {
+        assertThrows(BusinessException.class, () -> service.track(null, "0787274247"));
+        assertThrows(BusinessException.class, () -> service.track("DH-2026-006", " "));
+        when(orders.trackOrder("DH-404", "0787274247")).thenReturn(Optional.empty());
+        assertThrows(BusinessException.class, () -> service.track("DH-404", "0787274247"));
+    }
     private BienTheSanPham variant(Long id, String size, String price, String stock) {
         BienTheSanPham value = new BienTheSanPham(); value.setId(id); value.setKichCo(size); value.setGiaBan(new BigDecimal(price));
         value.setSoLuongTon(new BigDecimal(stock)); value.setConHang(new BigDecimal(stock).signum() > 0); return value;
