@@ -18,6 +18,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.math.BigDecimal;
 import java.sql.Date;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 
 @ExtendWith(MockitoExtension.class)
@@ -116,8 +117,9 @@ class ReportServiceImplTest {
         ReportSummaryResponse result = reportService.getSummary(null, null, null);
 
         assertNotNull(result);
-        assertEquals(LocalDate.now(), result.tuNgay());
-        assertEquals(LocalDate.now(), result.denNgay());
+        LocalDate expectedToday = LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh"));
+        assertEquals(expectedToday, result.tuNgay());
+        assertEquals(expectedToday, result.denNgay());
         assertEquals(BigDecimal.ZERO, result.tongDoanhThu());
         assertEquals(0L, result.tongSoDonHang());
         assertEquals(0L, result.tongSoLyDaBan());

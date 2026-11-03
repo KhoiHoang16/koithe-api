@@ -6,6 +6,8 @@ import org.mapstruct.*;
 
 @Mapper(componentModel = "spring")
 public interface CaLamViecMapper {
+    @Mapping(target = "maThuNgan", source = "thuNgan.id")
+    @Mapping(target = "tenThuNgan", source = "thuNgan.hoVaTen")
     @Mapping(target = "tongDoanhThu", ignore = true)
     @Mapping(target = "soDonHang", ignore = true)
     @Mapping(target = "tienMatDuKien", ignore = true)

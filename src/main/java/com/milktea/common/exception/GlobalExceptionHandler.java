@@ -30,6 +30,10 @@ public class GlobalExceptionHandler {
     ResponseEntity<ApiResponse<Void>> accessDenied(Exception ex) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new ApiResponse<>(403, "Bạn không có quyền truy cập tính năng này", null, Instant.now()));
     }
+    @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
+    ResponseEntity<ApiResponse<Void>> dataIntegrity(org.springframework.dao.DataIntegrityViolationException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(new ApiResponse<>(409, "Dữ liệu bị trùng lặp hoặc vi phạm ràng buộc hệ thống", null, Instant.now()));
+    }
     @ExceptionHandler(Exception.class)
     ResponseEntity<ApiResponse<Void>> unexpected(Exception ex) {
         return ResponseEntity.internalServerError().body(new ApiResponse<>(500, "Lỗi hệ thống", null, Instant.now()));

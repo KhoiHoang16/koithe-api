@@ -53,6 +53,9 @@ class OrderServiceImplTest {
 
     @BeforeEach void setUp() {
         savedItems.clear(); savedToppings.clear();
+        NguoiDung defaultCashier = new NguoiDung(); defaultCashier.setId(1L); defaultCashier.setDangHoatDong(true);
+        CaLamViec defaultShift = new CaLamViec(); defaultShift.setId(4L); defaultShift.setThuNgan(defaultCashier); defaultShift.setTrangThai("DANG_MO");
+        when(shifts.findFirstByTrangThaiAndDeletedAtIsNullOrderByThoiGianBatDauDesc("DANG_MO")).thenReturn(Optional.of(defaultShift));
         when(numbers.next()).thenReturn("DH-2026-001", "DH-2026-002", "DH-2026-003");
         when(orders.save(any())).thenAnswer(call -> { DonHang order = call.getArgument(0); if (order.getId() == null) order.setId(nextId.incrementAndGet()); return order; });
         when(orderItems.save(any())).thenAnswer(call -> { ChiTietDonHang item = call.getArgument(0); if (item.getId() == null) item.setId(nextId.incrementAndGet()); savedItems.add(item); return item; });
@@ -92,12 +95,29 @@ class OrderServiceImplTest {
                 null, null, null), null);
 
         assertEquals("DH-2026-001", response.displayCode());
+        assertEquals(4L, response.shiftId());
+        assertEquals(1L, response.cashierId());
         assertEquals(new BigDecimal("96000"), response.payableTotal());
         assertEquals(new BigDecimal("40000"), savedItems.getFirst().getDonGia());
         assertEquals(new BigDecimal("8000"), savedToppings.getFirst().getDonGia());
         variant.setGiaBan(new BigDecimal("50000")); topping.setGiaBan(new BigDecimal("10000"));
         assertEquals(new BigDecimal("40000"), savedItems.getFirst().getDonGia());
         assertNotNull(cart.getDeletedAt());
+    }
+
+    @Test void rejectsWebOrderWhenNoShiftIsOpen() {
+        String token = UUID.randomUUID().toString();
+        GioHang cart = new GioHang(); cart.setId(1L); cart.setTokenPhien(token);
+        BienTheSanPham variant = variant(5L, "M", "40000", "10");
+        ChiTietGioHang cartLine = new ChiTietGioHang(); cartLine.setId(10L); cartLine.setGioHang(cart); cartLine.setBienThe(variant); cartLine.setSoLuong(1);
+        when(carts.findFirstByTokenPhienAndDeletedAtIsNull(token)).thenReturn(Optional.of(cart));
+        when(cartItems.findAllByGioHangIdAndDeletedAtIsNullOrderById(1L)).thenReturn(List.of(cartLine));
+        when(shifts.findFirstByTrangThaiAndDeletedAtIsNullOrderByThoiGianBatDauDesc("DANG_MO")).thenReturn(Optional.empty());
+
+        BusinessException failure = assertThrows(BusinessException.class,
+                () -> service.create(new CreateOrderRequest(token, null, "MANG_VE", "WEBSITE", null,
+                        null, null, null), null));
+        assertEquals(400, failure.getStatus().value());
     }
 
     @Test void storesDeliveryRecipientAndAddressOnOrder() {

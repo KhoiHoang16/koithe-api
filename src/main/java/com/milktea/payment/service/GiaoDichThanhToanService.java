@@ -20,5 +20,8 @@ public interface GiaoDichThanhToanService {
     GiaoDichThanhToanResponse handleCallback(String method, Map<String, String> callbackParams);
 
     GiaoDichThanhToanResponse simulateSuccess(Long orderId, String method);
-}
 
+    GiaoDichThanhToanResponse confirmCash(Long paymentId, com.milktea.security.UserPrincipal principal);
+
+    GiaoDichThanhToanResponse confirmCashByOrderId(Long orderId, com.milktea.security.UserPrincipal principal);
+}

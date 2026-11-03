@@ -53,7 +53,24 @@ public class KhachHangServiceImpl implements KhachHangService {
     @Override
     @Transactional
     public KhachHangResponse create(KhachHangCreateRequest request) {
-        if (repo.existsBySoDienThoaiAndDeletedAtIsNull(request.soDienThoai())) {
+        String phone = request.soDienThoai() != null ? request.soDienThoai().trim() : "";
+        java.util.Optional<KhachHang> existing = repo.findBySoDienThoai(phone);
+        if (existing.isPresent()) {
+            KhachHang customer = existing.get();
+            if (customer.getDeletedAt() == null) {
+                throw error(HttpStatus.CONFLICT, "Số điện thoại đã được đăng ký");
+            }
+            // Khôi phục và cập nhật bản ghi cũ đã xóa mềm
+            customer.restore();
+            customer.setHoVaTen(request.hoVaTen());
+            customer.setEmail(request.email());
+            if (request.matKhau() != null && !request.matKhau().isBlank()) {
+                customer.setMatKhauMaHoa(encoder.encode(request.matKhau()));
+            }
+            return mapper.toResponse(repo.save(customer));
+        }
+
+        if (repo.existsBySoDienThoaiAndDeletedAtIsNull(phone)) {
             throw error(HttpStatus.CONFLICT, "Số điện thoại đã được đăng ký");
         }
 

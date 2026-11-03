@@ -18,5 +18,6 @@ public interface KhuyenMaiVoucherMapper {
 
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "chuongTrinh", ignore = true)
+    @Mapping(target = "soLuotDaDung", ignore = true)
     void updateEntity(@MappingTarget KhuyenMaiVoucher entity, KhuyenMaiVoucherRequest r);
 }

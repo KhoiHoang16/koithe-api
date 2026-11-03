@@ -33,10 +33,12 @@ class GiaoDichThanhToanServiceImplTest {
     com.milktea.payment.gateway.VnPayProperties vnPayProperties = mock(com.milktea.payment.gateway.VnPayProperties.class);
     com.milktea.payment.gateway.MomoProperties momoProperties = mock(com.milktea.payment.gateway.MomoProperties.class);
     com.milktea.payment.gateway.VietQrProperties vietQrProperties = mock(com.milktea.payment.gateway.VietQrProperties.class);
+    com.milktea.user.repository.NguoiDungRepository userRepository = mock(com.milktea.user.repository.NguoiDungRepository.class);
+    com.milktea.shift.repository.CaLamViecRepository caLamViecRepository = mock(com.milktea.shift.repository.CaLamViecRepository.class);
 
     GiaoDichThanhToanServiceImpl service = new GiaoDichThanhToanServiceImpl(
             gatewayFactory, paymentRepository, donHangRepository, orderService, paymentMapper,
-            vnPayProperties, momoProperties, vietQrProperties);
+            vnPayProperties, momoProperties, vietQrProperties, userRepository, caLamViecRepository);
 
     CashPaymentGateway cashGateway = new CashPaymentGateway();
 
@@ -307,5 +309,54 @@ class GiaoDichThanhToanServiceImplTest {
         assertNotNull(response);
         assertEquals("THANH_CONG", response.trangThai());
         verify(orderService).updateStatus(52L, "DA_THANH_TOAN");
+    }
+
+    @Test
+    void createGuestCash_RegistersPendingPayment_DoesNotMarkOrderPaid() {
+        DonHang order = new DonHang();
+        order.setId(60L);
+        order.setMaHienThiDon("DH-GUEST-CASH");
+        order.setTongTienThanhToan(new BigDecimal("43000.00"));
+        order.setTrangThai("CHO_XAC_NHAN");
+        order.setGuestCheckoutToken("token-xyz");
+
+        when(donHangRepository.findByIdAndDeletedAtIsNull(60L)).thenReturn(Optional.of(order));
+
+        com.milktea.payment.dto.GuestCashPaymentRequest request =
+                new com.milktea.payment.dto.GuestCashPaymentRequest(60L, "token-xyz", new BigDecimal("43000.00"));
+
+        GiaoDichThanhToanResponse response = service.createGuestCash(request);
+
+        assertNotNull(response);
+        assertEquals("CHO_XU_LY", response.trangThai());
+        assertEquals(new BigDecimal("43000.00"), response.soTien());
+        // Crucial requirement: order must NOT automatically transition to DA_THANH_TOAN
+        verify(orderService, never()).updateStatus(eq(60L), anyString());
+    }
+
+    @Test
+    void confirmCash_Success_MarksPaid() {
+        DonHang order = new DonHang();
+        order.setId(60L);
+        order.setTongTienThanhToan(new BigDecimal("43000.00"));
+        order.setTrangThai("CHO_XAC_NHAN");
+
+        GiaoDichThanhToan payment = new GiaoDichThanhToan();
+        payment.setId(99L);
+        payment.setDonHang(order);
+        payment.setPhuongThucThanhToan("TIEN_MAT");
+        payment.setSoTien(new BigDecimal("43000.00"));
+        payment.setTrangThai("CHO_XU_LY");
+
+        when(paymentRepository.findByIdAndDeletedAtIsNull(99L)).thenReturn(Optional.of(payment));
+
+        com.milktea.security.UserPrincipal cashier = new com.milktea.security.UserPrincipal(5L, "cashier5", "pass", true, "CASHIER");
+
+        GiaoDichThanhToanResponse response = service.confirmCash(99L, cashier);
+
+        assertNotNull(response);
+        assertEquals("THANH_CONG", payment.getTrangThai());
+        assertNotNull(payment.getThoiGianThanhToan());
+        verify(orderService).updateStatus(60L, "DA_THANH_TOAN");
     }
 }

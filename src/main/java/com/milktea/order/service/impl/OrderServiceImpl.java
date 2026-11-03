@@ -112,7 +112,11 @@ public class OrderServiceImpl implements OrderService {
         List<ChiTietGioHang> entries = cartItems.findAllByGioHangIdAndDeletedAtIsNullOrderById(cart.getId());
         if (entries.isEmpty())
             throw error(HttpStatus.BAD_REQUEST, "Không thể tạo đơn từ giỏ hàng rỗng");
-        DonHang order = orders.save(newOrder(request.channel(), request.serviceType(), customer, null, null,
+        CaLamViec activeShift = shifts.findFirstByTrangThaiAndDeletedAtIsNullOrderByThoiGianBatDauDesc("DANG_MO")
+                .orElseThrow(() -> error(HttpStatus.BAD_REQUEST,
+                        "Hiện chưa có ca làm việc nào đang mở. Vui lòng mở ca làm việc trước khi tạo đơn hàng!"));
+        NguoiDung activeCashier = activeShift.getThuNgan();
+        DonHang order = orders.save(newOrder(request.channel(), request.serviceType(), customer, activeCashier, activeShift,
                 request.tableId() == null ? null : table(request.tableId()), request.tenNguoiNhan(),
                 request.soDienThoaiNguoiNhan(), request.diaChiGiaoHang(),
                 principal == null ? request.cartToken() : null));
@@ -311,8 +315,23 @@ public class OrderServiceImpl implements OrderService {
         if (!allowed.contains(to))
             throw error(HttpStatus.BAD_REQUEST,
                     "Không thể chuyển trạng thái từ " + order.getTrangThai() + " sang " + to);
-        if ("DA_THANH_TOAN".equals(to))
+        if (!"DA_HUY".equals(to) && order.getCaLamViec() == null) {
+            shifts.findFirstByTrangThaiAndDeletedAtIsNullOrderByThoiGianBatDauDesc("DANG_MO").ifPresent(activeShift -> {
+                order.setCaLamViec(activeShift);
+                if (order.getThuNgan() == null && activeShift.getThuNgan() != null) {
+                    order.setThuNgan(activeShift.getThuNgan());
+                }
+            });
+        }
+        if ("DA_THANH_TOAN".equals(to)) {
             changeInventory(order, false);
+            if (order.getId() != null) {
+                orders.markPendingCashPaymentSuccess(order.getId());
+            }
+        }
+        if ("HOAN_THANH".equals(to) && order.getId() != null) {
+            orders.markPendingCashPaymentSuccess(order.getId());
+        }
         if ("DA_HUY".equals(to) && order.isTonKhoDaTru())
             changeInventory(order, true);
         order.setTrangThai(to);

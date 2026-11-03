@@ -15,4 +15,4 @@ logging:
   level:
     org.hibernate.SQL: debug
 server:
-  port: ${SERVER_PORT:8088}
+  port: ${SERVER_PORT:8081}

@@ -58,10 +58,35 @@ class KhachHangServiceImplTest {
     void createCustomer_ThrowsConflict_WhenPhoneExists() {
         KhachHangCreateRequest request = new KhachHangCreateRequest("0901234567", "Nguyen Van A", "a@gmail.com", "123456");
 
-        when(repo.existsBySoDienThoaiAndDeletedAtIsNull("0901234567")).thenReturn(true);
+        KhachHang active = new KhachHang();
+        active.setSoDienThoai("0901234567");
+        when(repo.findBySoDienThoai("0901234567")).thenReturn(Optional.of(active));
 
         BusinessException ex = assertThrows(BusinessException.class, () -> service.create(request));
         assertEquals(409, ex.getStatus().value());
+    }
+
+    @Test
+    void createCustomer_RestoresSoftDeletedCustomer() {
+        KhachHangCreateRequest request = new KhachHangCreateRequest("0901234567", "Nguyen Van B", "b@gmail.com", "654321");
+        KhachHang softDeleted = new KhachHang();
+        softDeleted.setSoDienThoai("0901234567");
+        softDeleted.markDeleted();
+
+        KhachHangResponse response = new KhachHangResponse(1L, "0901234567", "Nguyen Van B", "b@gmail.com",
+                0, HangThanhVien.DONG, false, null, null, null);
+
+        when(repo.findBySoDienThoai("0901234567")).thenReturn(Optional.of(softDeleted));
+        when(encoder.encode("654321")).thenReturn("$2a$10$hashed2");
+        when(repo.save(softDeleted)).thenReturn(softDeleted);
+        when(mapper.toResponse(softDeleted)).thenReturn(response);
+
+        KhachHangResponse result = service.create(request);
+
+        assertNotNull(result);
+        assertNull(softDeleted.getDeletedAt());
+        assertEquals("Nguyen Van B", softDeleted.getHoVaTen());
+        verify(repo).save(softDeleted);
     }
 
     @Test

@@ -65,11 +65,11 @@ public class CaLamViecServiceImpl implements CaLamViecService {
     @Override
     public CaLamViecResponse findCurrentActive(Long thuNganId) {
         if (thuNganId == null) {
-            return findCurrentActive();
+            return null;
         }
         return repository.findFirstByThuNganIdAndTrangThaiAndDeletedAtIsNullOrderByThoiGianBatDauDesc(thuNganId, DANG_MO)
                 .map(this::toReportResponse)
-                .orElseGet(this::findCurrentActive);
+                .orElse(null);
     }
 
     @Override
@@ -101,13 +101,30 @@ public class CaLamViecServiceImpl implements CaLamViecService {
         ca.setTrangThai(DANG_MO);
 
         CaLamViec saved = repository.save(ca);
+        if (saved.getId() != null && thuNgan.getId() != null) {
+            repository.claimUnassignedOrders(saved.getId(), thuNgan.getId());
+        }
         return toReportResponse(saved);
     }
 
     @Override
     @Transactional
     public CaLamViecResponse update(Long id, CaLamViecRequest r) {
+        return update(id, r, null);
+    }
+
+    @Override
+    @Transactional
+    public CaLamViecResponse update(Long id, CaLamViecRequest r, com.milktea.security.UserPrincipal principal) {
         CaLamViec ca = shift(id);
+
+        if (principal != null) {
+            boolean isAdminOrManager = "ADMIN".equalsIgnoreCase(principal.role()) || "MANAGER".equalsIgnoreCase(principal.role());
+            boolean isOwner = ca.getThuNgan() != null && ca.getThuNgan().getId().equals(principal.id());
+            if (!isAdminOrManager && !isOwner) {
+                throw error(HttpStatus.FORBIDDEN, "Bạn không có quyền thao tác trên ca làm việc của người khác");
+            }
+        }
 
         // Đóng ca: chuyển từ DANG_MO sang DA_DONG
         if (DA_DONG.equals(r.trangThai()) || r.tienKetCa() != null) {
@@ -158,6 +175,7 @@ public class CaLamViecServiceImpl implements CaLamViecService {
 
         BigDecimal tongDoanhThu = BigDecimal.ZERO;
         Long soDon = 0L;
+        BigDecimal tienMatThuDuoc = BigDecimal.ZERO;
         if (ca.getId() != null) {
             BigDecimal rev = repository.sumRevenueByCaId(ca.getId());
             if (rev != null) {
@@ -167,16 +185,25 @@ public class CaLamViecServiceImpl implements CaLamViecService {
             if (cnt != null) {
                 soDon = cnt;
             }
+            BigDecimal cash = repository.sumTienMatThanhCongByCaId(ca.getId());
+            if (cash != null) {
+                tienMatThuDuoc = cash;
+            }
         }
 
-        BigDecimal tienMatDuKien = ca.getTienDauCa() != null ? ca.getTienDauCa().add(tongDoanhThu) : tongDoanhThu;
+        BigDecimal tienMatDuKien = (ca.getTienDauCa() != null ? ca.getTienDauCa() : BigDecimal.ZERO).add(tienMatThuDuoc);
         BigDecimal chenhLech = null;
         if (ca.getTienKetCa() != null && ca.getTienKetCa().compareTo(BigDecimal.ZERO) > 0) {
             chenhLech = ca.getTienKetCa().subtract(tienMatDuKien);
         }
 
+        Long maThuNgan = ca.getThuNgan() != null ? ca.getThuNgan().getId() : null;
+        String tenThuNgan = ca.getThuNgan() != null ? ca.getThuNgan().getHoVaTen() : null;
+
         return new CaLamViecResponse(
                 base.id(),
+                maThuNgan,
+                tenThuNgan,
                 base.thoiGianBatDau(),
                 base.thoiGianKetThuc(),
                 base.tienDauCa(),

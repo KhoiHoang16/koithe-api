@@ -31,8 +31,8 @@ class MomoPaymentGatewayTest {
         properties.setAccessKey("klm05TvNBzhg7h7j");
         properties.setSecretKey("at67qH6mk8w5Y1nAyMoYKMWACiEi2bsa");
         properties.setPayUrl("https://test-payment.momo.vn/v2/gateway/api/create");
-        properties.setReturnUrl("http://localhost:8088/api/payments/momo-return");
-        properties.setIpnUrl("http://localhost:8088/api/payments/momo-ipn");
+        properties.setReturnUrl("http://localhost:8081/api/payments/momo-return");
+        properties.setIpnUrl("http://localhost:8081/api/payments/momo-ipn");
 
         objectMapper = new ObjectMapper();
         httpClient = mock(HttpClient.class);

@@ -79,8 +79,9 @@ public class CaLamViecController {
     @Operation(summary = "PUT /api/shifts/{id} - Cập nhật / Đóng ca làm việc (đối soát tiền mặt)")
     public ApiResponse<CaLamViecResponse> update(
             @PathVariable Long id,
-            @RequestBody CaLamViecRequest r) {
-        return ApiResponse.success(service.update(id, r));
+            @RequestBody CaLamViecRequest r,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return ApiResponse.success(service.update(id, r, principal));
     }
 
     @PostMapping("/{id}/close")
@@ -88,8 +89,9 @@ public class CaLamViecController {
     @Operation(summary = "POST /api/shifts/{id}/close - Đóng ca, nhập tiền kết ca và đối soát doanh thu")
     public ApiResponse<CaLamViecResponse> close(
             @PathVariable Long id,
-            @RequestBody CaLamViecRequest r) {
-        return ApiResponse.success(service.update(id, r));
+            @RequestBody CaLamViecRequest r,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return ApiResponse.success(service.update(id, r, principal));
     }
 
     @DeleteMapping("/{id}")

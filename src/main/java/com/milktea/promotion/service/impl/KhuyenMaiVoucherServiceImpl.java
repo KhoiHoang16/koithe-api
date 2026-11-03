@@ -98,7 +98,9 @@ public class KhuyenMaiVoucherServiceImpl implements KhuyenMaiVoucherService {
         ChuongTrinhKhuyenMai chuongTrinh = chuongTrinhRepository.findByIdAndDeletedAtIsNull(r.maChuongTrinh())
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "Không tìm thấy chương trình khuyến mãi với ID: " + r.maChuongTrinh()));
 
+        Integer currentSoLuotDaDung = entity.getSoLuotDaDung();
         mapper.updateEntity(entity, r);
+        entity.setSoLuotDaDung(currentSoLuotDaDung != null ? currentSoLuotDaDung : 0);
         entity.setMaCode(normalizedCode);
         entity.setChuongTrinh(chuongTrinh);
 

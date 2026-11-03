@@ -22,7 +22,7 @@ class VnPayPaymentGatewayTest {
         properties.setTmnCode("2QXUI4B4");
         properties.setHashSecret("RAOCTAV2VYRW19J77TIFOUF9NE0U0DBC");
         properties.setPayUrl("https://sandbox.vnpayment.vn/paymentv2/vpcpay.html");
-        properties.setReturnUrl("http://localhost:8088/api/payments/vnpay-return");
+        properties.setReturnUrl("http://localhost:8081/api/payments/vnpay-return");
         gateway = new VnPayPaymentGateway(properties);
     }
 

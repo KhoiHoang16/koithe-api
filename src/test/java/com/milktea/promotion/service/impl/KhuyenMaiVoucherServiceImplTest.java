@@ -227,4 +227,24 @@ class KhuyenMaiVoucherServiceImplTest {
         assertEquals(HttpStatus.CONFLICT, ex.getStatus());
         assertTrue(ex.getMessage().contains("NEWCODE"));
     }
+
+    @Test
+    @DisplayName("Cập nhật Voucher không làm thay đổi soLuotDaDung đã phát sinh trong DB")
+    void testUpdateVoucher_DoesNotOverwriteSoLuotDaDung() {
+        sampleVoucher.setSoLuotDaDung(42); // currently 42 uses in DB
+
+        when(voucherRepository.findByIdAndDeletedAtIsNull(10L)).thenReturn(Optional.of(sampleVoucher));
+        when(chuongTrinhRepository.findByIdAndDeletedAtIsNull(1L)).thenReturn(Optional.of(activeProgram));
+        when(voucherRepository.save(any(KhuyenMaiVoucher.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        KhuyenMaiVoucherRequest request = new KhuyenMaiVoucherRequest(
+                1L, "SUMMER20", LoaiGiamGia.PHAN_TRAM, BigDecimal.valueOf(25),
+                BigDecimal.valueOf(50000), BigDecimal.valueOf(100000), 200, 0 // request sends 0
+        );
+
+        voucherService.update(10L, request);
+
+        // soLuotDaDung should remain 42!
+        assertEquals(42, sampleVoucher.getSoLuotDaDung());
+    }
 }

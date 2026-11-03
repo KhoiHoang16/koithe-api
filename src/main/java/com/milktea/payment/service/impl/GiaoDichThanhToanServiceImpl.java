@@ -54,6 +54,8 @@ public class GiaoDichThanhToanServiceImpl implements GiaoDichThanhToanService {
     private final VnPayProperties vnPayProperties;
     private final MomoProperties momoProperties;
     private final VietQrProperties vietQrProperties;
+    private final com.milktea.user.repository.NguoiDungRepository userRepository;
+    private final com.milktea.shift.repository.CaLamViecRepository caLamViecRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -169,8 +171,32 @@ public class GiaoDichThanhToanServiceImpl implements GiaoDichThanhToanService {
                     "Token không có quyền thanh toán đơn hàng này");
         }
 
-        return create(new GiaoDichThanhToanRequest(
-                request.maDonHang(), "TIEN_MAT", request.soTien(), null, null, null));
+        if (!"CHO_XAC_NHAN".equals(order.getTrangThai())) {
+            if ("DA_THANH_TOAN".equals(order.getTrangThai())) {
+                throw new BusinessException(HttpStatus.BAD_REQUEST, "Đơn hàng này đã được thanh toán trước đó");
+            }
+            if ("DA_HUY".equals(order.getTrangThai())) {
+                throw new BusinessException(HttpStatus.BAD_REQUEST, "Đơn hàng đã bị hủy, không thể thanh toán");
+            }
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "Đơn hàng không ở trạng thái chờ thanh toán: " + order.getTrangThai());
+        }
+
+        if (request.soTien().compareTo(order.getTongTienThanhToan()) != 0) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST,
+                    String.format("Số tiền thanh toán (%s) phải bằng đúng tổng tiền đơn hàng (%s)",
+                            request.soTien(), order.getTongTienThanhToan()));
+        }
+
+        GiaoDichThanhToan payment = new GiaoDichThanhToan();
+        payment.setDonHang(order);
+        payment.setPhuongThucThanhToan("TIEN_MAT");
+        payment.setSoTien(request.soTien());
+        payment.setNoiDungVietqr(order.getMaHienThiDon());
+        payment.setTrangThai("CHO_XU_LY");
+        payment.setThoiGianThanhToan(null);
+
+        payment = paymentRepository.save(payment);
+        return paymentMapper.toResponse(payment);
     }
 
     @Override
@@ -385,5 +411,100 @@ public class GiaoDichThanhToanServiceImpl implements GiaoDichThanhToanService {
         } else {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "Phương thức mô phỏng không hợp lệ. Chỉ hỗ trợ MOMO, VNPAY hoặc CHUYEN_KHOAN_QR");
         }
+    }
+    @Override
+    @Transactional
+    public GiaoDichThanhToanResponse confirmCash(Long paymentId, com.milktea.security.UserPrincipal principal) {
+        GiaoDichThanhToan payment = paymentRepository.findByIdAndDeletedAtIsNull(paymentId)
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "Không tìm thấy giao dịch với ID: " + paymentId));
+
+        if (!"TIEN_MAT".equalsIgnoreCase(payment.getPhuongThucThanhToan())) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "Giao dịch không phải phương thức tiền mặt");
+        }
+
+        if ("THANH_CONG".equals(payment.getTrangThai())) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "Giao dịch này đã được xác nhận thanh toán trước đó");
+        }
+
+        DonHang order = payment.getDonHang();
+        if (order == null || order.getDeletedAt() != null) {
+            throw new BusinessException(HttpStatus.NOT_FOUND, "Không tìm thấy đơn hàng tương ứng");
+        }
+
+        if ("DA_HUY".equals(order.getTrangThai())) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "Đơn hàng đã bị hủy, không thể thu tiền");
+        }
+
+        if (principal != null) {
+            if (userRepository != null && order.getThuNgan() == null) {
+                userRepository.findById(principal.id()).ifPresent(order::setThuNgan);
+            }
+            if (caLamViecRepository != null && order.getCaLamViec() == null) {
+                caLamViecRepository.findFirstByThuNganIdAndTrangThaiAndDeletedAtIsNullOrderByThoiGianBatDauDesc(principal.id(), "DANG_MO")
+                        .ifPresent(order::setCaLamViec);
+            }
+            donHangRepository.save(order);
+        }
+
+        payment.setTrangThai("THANH_CONG");
+        payment.setThoiGianThanhToan(Instant.now());
+        payment = paymentRepository.save(payment);
+
+        orderService.updateStatus(order.getId(), "DA_THANH_TOAN");
+
+        return paymentMapper.toResponse(payment);
+    }
+
+    @Override
+    @Transactional
+    public GiaoDichThanhToanResponse confirmCashByOrderId(Long orderId, com.milktea.security.UserPrincipal principal) {
+        DonHang order = donHangRepository.findByIdAndDeletedAtIsNull(orderId)
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "Không tìm thấy đơn hàng với ID: " + orderId));
+
+        List<GiaoDichThanhToan> payments = paymentRepository.findAllByDonHangIdAndDeletedAtIsNull(orderId);
+        GiaoDichThanhToan pendingPayment = payments.stream()
+                .filter(p -> "TIEN_MAT".equalsIgnoreCase(p.getPhuongThucThanhToan()))
+                .filter(p -> "CHO_XU_LY".equals(p.getTrangThai()))
+                .sorted((a, b) -> b.getId().compareTo(a.getId()))
+                .findFirst()
+                .orElse(null);
+
+        if (pendingPayment != null) {
+            return confirmCash(pendingPayment.getId(), principal);
+        }
+
+        boolean alreadySuccess = payments.stream()
+                .anyMatch(p -> "TIEN_MAT".equalsIgnoreCase(p.getPhuongThucThanhToan()) && "THANH_CONG".equals(p.getTrangThai()));
+        if (alreadySuccess || "DA_THANH_TOAN".equals(order.getTrangThai())) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "Đơn hàng này đã được thanh toán trước đó");
+        }
+
+        if ("DA_HUY".equals(order.getTrangThai())) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "Đơn hàng đã bị hủy, không thể thu tiền");
+        }
+
+        GiaoDichThanhToan newPayment = new GiaoDichThanhToan();
+        newPayment.setDonHang(order);
+        newPayment.setPhuongThucThanhToan("TIEN_MAT");
+        newPayment.setSoTien(order.getTongTienThanhToan());
+        newPayment.setNoiDungVietqr(order.getMaHienThiDon());
+        newPayment.setTrangThai("THANH_CONG");
+        newPayment.setThoiGianThanhToan(Instant.now());
+        newPayment = paymentRepository.save(newPayment);
+
+        if (principal != null) {
+            if (userRepository != null && order.getThuNgan() == null) {
+                userRepository.findById(principal.id()).ifPresent(order::setThuNgan);
+            }
+            if (caLamViecRepository != null && order.getCaLamViec() == null) {
+                caLamViecRepository.findFirstByThuNganIdAndTrangThaiAndDeletedAtIsNullOrderByThoiGianBatDauDesc(principal.id(), "DANG_MO")
+                        .ifPresent(order::setCaLamViec);
+            }
+            donHangRepository.save(order);
+        }
+
+        orderService.updateStatus(order.getId(), "DA_THANH_TOAN");
+
+        return paymentMapper.toResponse(newPayment);
     }
 }

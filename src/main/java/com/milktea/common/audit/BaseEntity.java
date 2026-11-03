@@ -14,4 +14,6 @@ public abstract class BaseEntity {
     @UpdateTimestamp @Column(name = "updated_at") private Instant updatedAt;
     @Column(name = "deleted_at") private Instant deletedAt;
     public void markDeleted() { this.deletedAt = Instant.now(); }
+    public void restore() { this.deletedAt = null; }
+    public void setDeletedAt(Instant deletedAt) { this.deletedAt = deletedAt; }
 }

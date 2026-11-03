@@ -314,6 +314,75 @@ class CaLamViecServiceImplTest {
         assertNull(result);
     }
 
+    @Test
+    void findCurrentActive_withThuNganId_returnsOnlyTheirShift() {
+        CaLamViec ca1 = openShift(1L);
+        CaLamViecResponse resp1 = dummyResponse(1L, "DANG_MO");
+        when(repository.findFirstByThuNganIdAndTrangThaiAndDeletedAtIsNullOrderByThoiGianBatDauDesc(3L, "DANG_MO"))
+                .thenReturn(Optional.of(ca1));
+        when(mapper.toResponse(ca1)).thenReturn(resp1);
+
+        CaLamViecResponse result = service.findCurrentActive(3L);
+
+        assertNotNull(result);
+        assertEquals(1L, result.id());
+    }
+
+    @Test
+    void findCurrentActive_withThuNganId_returnsNullWhenUserHasNoActiveShift() {
+        when(repository.findFirstByThuNganIdAndTrangThaiAndDeletedAtIsNullOrderByThoiGianBatDauDesc(5L, "DANG_MO"))
+                .thenReturn(Optional.empty());
+
+        CaLamViecResponse result = service.findCurrentActive(5L);
+
+        assertNull(result);
+    }
+
+    @Test
+    void update_throwsForbidden_whenCashierClosesOtherCashierShift() {
+        CaLamViec ca = openShift(1L); // owned by cashier 3L
+        when(repository.findByIdAndDeletedAtIsNull(1L)).thenReturn(Optional.of(ca));
+
+        com.milktea.security.UserPrincipal otherCashier = new com.milktea.security.UserPrincipal(9L, "other", "pass", true, "CASHIER");
+        CaLamViecRequest request = new CaLamViecRequest(null, null, null, null, new BigDecimal("500000"), "DA_DONG");
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> service.update(1L, request, otherCashier));
+        assertEquals(403, ex.getStatus().value());
+    }
+
+    @Test
+    void update_allowed_whenAdminClosesOtherCashierShift() {
+        CaLamViec ca = openShift(1L); // owned by cashier 3L
+        when(repository.findByIdAndDeletedAtIsNull(1L)).thenReturn(Optional.of(ca));
+        when(mapper.toResponse(ca)).thenReturn(dummyResponse(1L, "DA_DONG"));
+
+        com.milktea.security.UserPrincipal admin = new com.milktea.security.UserPrincipal(1L, "admin", "pass", true, "ADMIN");
+        CaLamViecRequest request = new CaLamViecRequest(null, null, null, null, new BigDecimal("500000"), "DA_DONG");
+
+        CaLamViecResponse result = service.update(1L, request, admin);
+        assertNotNull(result);
+        assertEquals("DA_DONG", ca.getTrangThai());
+    }
+
+    @Test
+    void toReportResponse_calculatesTienMatDuKien_fromTienMatThanhCong() {
+        CaLamViec ca = openShift(1L);
+        ca.setTienDauCa(new BigDecimal("100000"));
+        when(repository.findByIdAndDeletedAtIsNull(1L)).thenReturn(Optional.of(ca));
+        when(mapper.toResponse(ca)).thenReturn(dummyResponse(1L, "DANG_MO"));
+        when(repository.sumRevenueByCaId(1L)).thenReturn(new BigDecimal("500000")); // total orders
+        when(repository.sumTienMatThanhCongByCaId(1L)).thenReturn(new BigDecimal("300000")); // cash payments only
+        when(repository.countOrdersByCaId(1L)).thenReturn(5L);
+
+        CaLamViecResponse result = service.findById(1L);
+
+        assertNotNull(result);
+        // Tien mat du kien = tienDauCa (100k) + cash payments (300k) = 400k (not 600k!)
+        assertEquals(new BigDecimal("400000"), result.tienMatDuKien());
+        assertEquals(3L, result.maThuNgan());
+        assertEquals("Thu Ngân 3", result.tenThuNgan());
+    }
+
     // ─── helpers ────────────────────────────────────────────────────────
 
     private NguoiDung activeCashier(Long id) {

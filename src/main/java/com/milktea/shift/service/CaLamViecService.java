@@ -18,5 +18,7 @@ public interface CaLamViecService {
 
     CaLamViecResponse update(Long id, CaLamViecRequest r);
 
+    CaLamViecResponse update(Long id, CaLamViecRequest r, com.milktea.security.UserPrincipal principal);
+
     void delete(Long id);
 }
