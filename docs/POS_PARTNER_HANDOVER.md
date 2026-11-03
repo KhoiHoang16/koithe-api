@@ -2,7 +2,7 @@
 
 > **Cập nhật lần cuối:** 04/11/2026  
 > **Repository Backend:** `https://github.com/KhoiHoang16/koithe-api.git` (Nhánh chuẩn: **`integration/api-baseline`**)  
-> **Repository Máy POS:** `https://github.com/JohnPattle/koithe-pos.git` (Đối chiếu trực tiếp trên nhánh **`main`**)  
+> **Repository Máy POS:** `https://github.com/JohnPattle/koithe-pos.git` (Nhánh gốc: **`main`**, Nhánh tính năng đã push sẵn: **`feature/complete-11-core-features`**)  
 > **Cổng chạy Backend (Docker):** `http://localhost:8081` (Swagger UI: `http://localhost:8081/swagger-ui.html`)
 
 ---
@@ -71,7 +71,7 @@ docker compose up -d --build backend
 ---
 
 ### 3. Bổ sung Module Quản lý Nhân viên (`/api/users`) & Báo cáo Thống kê (`/api/reports/summary`)
-Backend đã mở đầy đủ các endpoint cho Quản lý nhân viên và Báo cáo doanh thu (chi tiết DTO và cách gắn vào POS nằm ở **Phần 3** bên dưới).
+Backend đã mở đầy đủ các endpoint cho Quản lý nhân viên (`/api/users`, `/api/users/roles`) và Báo cáo doanh thu (`/api/reports/summary`).
 
 ### 4. Khôi phục Khách hàng xóa mềm & Bảo toàn lượt dùng Voucher
 - **`POST /api/customers`**: Nếu tạo mới khách hàng có SĐT trùng với bản ghi đã xóa mềm (`deleted_at IS NOT NULL`), Backend tự động khôi phục (`restore()`) và cập nhật lại thông tin thay vì báo lỗi 500.
@@ -79,132 +79,35 @@ Backend đã mở đầy đủ các endpoint cho Quản lý nhân viên và Báo
 
 ---
 
-## PHẦN 3: RÀ SOÁT NHÁNH `main` CỦA `koithe-pos` & HƯỚNG DẪN HOÀN THIỆN CHI TIẾT
+## PHẦN 3: RÀ SOÁT NHÁNH `main` CỦA `koithe-pos` & HƯỚNG DẪN HOÀN THIỆN
 
-Qua đọc mã nguồn nhánh **`main`** hiện tại của `koithe-pos`, các phân hệ **Đăng nhập (`authApi.ts`), Bán hàng tại quầy (`orderApi.ts`), Thanh toán (`paymentApi.ts`), Ca làm việc (`shiftApi.ts`), Bàn (`tableApi.ts`), Khách hàng (`customerApi.ts`), Kho & Phiếu nhập (`inventoryApi.ts`), Khuyến mãi (`promotionApi.ts`)** đã được thiết kế và gán API rất tốt.
-
-Để hoàn thiện nốt các nghiệp vụ còn đang để dữ liệu tĩnh (mock) hoặc lệch tên trường trên nhánh `main`, Partner chỉ cần thực hiện **6 hạng mục** dưới đây:
-
----
-
-### 🛠️ Hạng mục 1: Nối API Quản lý Nhân viên (`/api/users`) vào `AdminDashboardView.tsx`
-
-- **Hiện trạng trên nhánh `main`:**
-  - Tại `src/components/AdminDashboardView.tsx` (dòng 223–273), danh sách nhân viên `staffUsers` đang khởi tạo bằng mảng 5 nhân viên cố định trong `useState`, và hàm `toggleUserActive` (dòng 325) chỉ đổi state trên bộ nhớ tạm.
-- **API Backend đã có sẵn (`/api/users` — Role: `ADMIN`, `MANAGER`):**
-  1. **Lấy danh sách nhân viên:** `GET /api/users`
-     - Response `data`:
-       ```json
-       [
-         {
-           "id": 1,
-           "tenDangNhap": "admin",
-           "hoVaTen": "Administrator",
-           "email": "admin@koithe.local",
-           "maVaiTro": 1,
-           "tenVaiTro": "ADMIN",
-           "dangHoatDong": true
-         }
-       ]
-       ```
-  2. **Lấy danh sách vai trò:** `GET /api/users/roles`
-     - Response `data`: `[{ "id": 1, "tenVaiTro": "ADMIN", "moTa": "..." }, ...]`
-  3. **Thêm nhân viên mới:** `POST /api/users`
-     - Request Body:
-       ```json
-       {
-         "tenDangNhap": "cashier03",
-         "matKhau": "Cashier@123",
-         "hoVaTen": "Lê Thu Ngân 03",
-         "email": "cashier03@koithe.vn",
-         "maVaiTro": 3,
-         "dangHoatDong": true
-       }
-       ```
-  4. **Cập nhật thông tin nhân viên:** `PUT /api/users/{id}`
-     - Request Body (để trống `matKhau` nếu không đổi mật khẩu):
-       ```json
-       {
-         "hoVaTen": "Lê Thu Ngân 03 (Đã cập nhật)",
-         "email": "cashier03@koithe.vn",
-         "matKhau": "",
-         "maVaiTro": 3,
-         "dangHoatDong": true
-       }
-       ```
-  5. **Khóa / Mở khóa nhanh tài khoản:** `PATCH /api/users/{id}/status`
-     - Request Body: `{ "dangHoatDong": false }`
-  6. **Xóa mềm nhân viên (Role `ADMIN`):** `DELETE /api/users/{id}`
-- **Cách thực hiện trên POS:**
-  - Tạo file `src/services/userApi.ts` (và export qua `src/services/index.ts`) gọi các endpoint trên.
-  - Trong tab `staff` của `AdminDashboardView.tsx`, gọi `GET /api/users` trong `useEffect` để hiển thị danh sách thật, nối nút Khóa/Mở khóa vào `PATCH /api/users/{id}/status`, và thêm Modal Tạo/Sửa nhân viên.
+### 3.1. Những gì nhánh `main` của `koithe-pos` đã làm tốt
+Trên nhánh `main` (`60d096b`), các phân hệ cốt lõi gồm **Đăng nhập (`authApi.ts`), Bán hàng tại quầy (`orderApi.ts`), Thanh toán (`paymentApi.ts`), Ca làm việc (`shiftApi.ts`), Bàn (`tableApi.ts`), Khách hàng (`customerApi.ts`), Kho & Phiếu nhập (`inventoryApi.ts`), Khuyến mãi (`promotionApi.ts`)** đã được thiết kế và gán API đầy đủ.
 
 ---
 
-### 🛠️ Hạng mục 2: Nối API Báo cáo Doanh thu (`/api/reports/summary`) vào `ReportView.tsx`
+### 3.2. Checklist các bước Partner cần thực hiện trên `koithe-pos`
 
-- **Hiện trạng trên nhánh `main`:**
-  - Tại `src/components/ReportView.tsx`, số liệu báo cáo hiện đang tự cộng thủ công từ mảng `orders` truyền qua props ở phía client.
-- **API Backend đã có sẵn (`GET /api/reports/summary` — Role: `ADMIN`, `MANAGER`):**
-  - **Endpoint:** `GET /api/reports/summary?from=2026-11-01&to=2026-11-04&top=5` *(Nếu không truyền `from` và `to`, mặc định lấy ngày hôm nay)*.
-  - **Response `data`:**
-    ```json
-    {
-      "tuNgay": "2026-11-01",
-      "denNgay": "2026-11-04",
-      "tongDoanhThu": 15850000.00,
-      "tongSoDonHang": 42,
-      "tongSoLyDaBan": 78,
-      "doanhThuTheoNgay": [
-        { "ngay": "2026-11-03", "doanhThu": 1250000.00, "soDon": 15 }
-      ],
-      "doanhThuTheoKenh": [
-        { "maKenh": "TAI_QUAY_POS", "tenKenh": "Tại quầy (POS)", "doanhThu": 10500000.00, "soDon": 28, "tyLePhanTram": 66.25 },
-        { "maKenh": "ONLINE_WEB", "tenKenh": "Trực tuyến (Web / QR)", "doanhThu": 5350000.00, "soDon": 14, "tyLePhanTram": 33.75 }
-      ],
-      "doanhThuTheoPhuongThuc": [
-        { "maPhuongThuc": "TIEN_MAT", "tenPhuongThuc": "Tiền mặt", "doanhThu": 8000000.00, "soGiaoDich": 20, "tyLePhanTram": 50.47 },
-        { "maPhuongThuc": "CHUYEN_KHOAN_QR", "tenPhuongThuc": "VietQR", "doanhThu": 7850000.00, "soGiaoDich": 22, "tyLePhanTram": 49.53 }
-      ],
-      "topSanPhamBanChay": [
-        { "bienTheId": 1, "tenSanPham": "Golden Bubble Milk Tea", "kichCo": "M", "soLuongDaBan": 35, "doanhThu": 1925000.00 }
-      ]
-    }
-    ```
-- **Cách thực hiện trên POS:**
-  - Tạo `src/services/reportApi.ts` gọi `GET /api/reports/summary?from=${from}&to=${to}&top=${top}`.
-  - Trong `ReportView.tsx`, khi người dùng chọn mốc thời gian (`Hôm nay`, `7 ngày qua`, `Tháng này`), quy đổi ra `from` / `to` (`YYYY-MM-DD`) và gọi API để hiển thị KPI, biểu đồ doanh thu theo ngày, tỷ trọng kênh bán và Top sản phẩm bán chạy.
+#### ✅ Bước 1: Merge nhánh `origin/feature/complete-11-core-features` vào `main`
+Nhánh **`feature/complete-11-core-features` (`7277299`)** đã được push sẵn lên GitHub `origin` (không đụng trực tiếp vào `main` để Partner chủ động kiểm tra và merge). Nhánh này đã hoàn thiện sẵn 4 cụm tính năng còn đang dùng dữ liệu tĩnh trên `main`:
+1. **Quản lý nhân viên Live API (`src/services/userApi.ts` + `src/components/StaffModal.tsx`)**: Nối trực tiếp `GET / POST / PUT / PATCH / DELETE /api/users` và `GET /api/users/roles` vào tab Nhân sự trong `AdminDashboardView.tsx` (thay thế mảng 5 nhân viên hardcode).
+2. **Báo cáo doanh thu Live API (`src/services/reportApi.ts` + `src/components/ReportView.tsx`)**: Nối trực tiếp `GET /api/reports/summary?from=YYYY-MM-DD&to=YYYY-MM-DD&top=5`.
+3. **Quản lý Danh mục (`src/components/CategoryManagementModal.tsx` + `src/services/catalogApi.ts`)**: Bổ sung Thêm / Sửa / Xóa danh mục sản phẩm (`POST / PUT / DELETE /api/categories`).
+4. **Chỉnh sửa Sản phẩm (`src/components/EditProductModal.tsx`)**: Cập nhật thông tin sản phẩm (`PUT /api/products/{id}`) và quản lý biến thể Size/Giá.
+
+👉 **Lệnh để Partner kéo và merge vào `main`:**
+```bash
+cd koithe-pos
+git fetch origin
+git checkout main
+git merge origin/feature/complete-11-core-features
+```
+*(Hoặc Partner có thể xem và merge trực tiếp qua Pull Request tại: `https://github.com/JohnPattle/koithe-pos/pull/new/feature/complete-11-core-features`)*
 
 ---
 
-### 🛠️ Hạng mục 3: Bổ sung CRUD Danh mục (`/api/categories`) & Sửa Sản phẩm (`PUT /api/products/{id}`)
-
-- **Hiện trạng trên nhánh `main`:**
-  - Trong `src/services/catalogApi.ts`, hiện đã có `getCategories`, `getProducts`, `createProduct`, `updateVariantStock`, `deleteProduct`, nhưng **chưa có** hàm Thêm/Sửa/Xóa Danh mục và hàm Sửa thông tin Sản phẩm (`PUT /api/products/{id}`).
-- **API Backend đã có sẵn (Role: `ADMIN`, `MANAGER`):**
-  1. **Tạo danh mục:** `POST /api/categories` — Body: `{ "tenDanhMuc": "Trà Trái Cây Nhiệt Đới" }`
-  2. **Sửa danh mục:** `PUT /api/categories/{id}` — Body: `{ "tenDanhMuc": "Tên mới" }`
-  3. **Xóa danh mục:** `DELETE /api/categories/{id}` *(Trả lỗi 409 nếu danh mục đang còn sản phẩm)*.
-  4. **Cập nhật sản phẩm:** `PUT /api/products/{id}`
-     - Body:
-       ```json
-       {
-         "tenSanPham": "Golden Bubble Milk Tea",
-         "maDanhMuc": 1,
-         "moTa": "Trà sữa trân châu hoàng kim đặc trưng",
-         "hinhAnh": "https://...",
-         "noiBat": true,
-         "dangBan": true
-       }
-       ```
-  5. **Thêm biến thể Size/Giá mới cho sản phẩm:** `POST /api/products/{id}/variants`
-     - Body: `{ "kichCo": "L", "giaBan": 65000, "soLuongTon": 100 }`
-
----
-
-### 🛠️ Hạng mục 4: Chuẩn hóa nhận diện Kênh đặt hàng (`channel`) trong `OnlineOrdersView.tsx`
-
-- **Hiện trạng trên nhánh `main`:**
+#### ✅ Bước 2: Chuẩn hóa nhận diện Kênh đặt hàng (`channel`) trong `OnlineOrdersView.tsx`
+- **Hiện trạng trên `main`:**
   - Tại `src/components/OnlineOrdersView.tsx` (dòng 94 và dòng 116), hàm `getChannelInfo(order)` đang kiểm tra:
     ```tsx
     if (order.channel === 'WEB' || order.orderCode.startsWith('WEB-')) { ... }
@@ -215,22 +118,20 @@ Qua đọc mã nguồn nhánh **`main`** hiện tại của `koithe-pos`, các p
     - `channel: "QUET_QR_BAN"` (cho đơn khách quét mã QR tại bàn)
     - `channel: "TAI_QUAY_POS"` (cho đơn bán tại quầy POS)
     - `displayCode: "DH-2026-001"`
-- **Cách sửa trong `src/components/OnlineOrdersView.tsx`:**
-  - Tại **dòng 94**, thêm điều kiện `order.channel === 'WEBSITE'`:
+- **Cách cập nhật trong `src/components/OnlineOrdersView.tsx`:**
+  - Tại **dòng 94**, thêm `order.channel === 'WEBSITE'`:
     ```tsx
     if (order.channel === 'WEBSITE' || order.channel === 'WEB' || order.orderCode.startsWith('WEB-')) {
     ```
-  - Tại **dòng 116**, thêm điều kiện `order.channel === 'QUET_QR_BAN'`:
+  - Tại **dòng 116**, thêm `order.channel === 'QUET_QR_BAN'`:
     ```tsx
     if (order.channel === 'QUET_QR_BAN' || order.channel === 'QR_BAN' || order.orderCode.startsWith('QR-') || (order.tableId && order.orderType === 'TAI_CHO')) {
     ```
-  - Tại **`src/services/orderApi.ts` (dòng 334)**, giữ nguyên `o.channel` từ Backend trả về.
 
 ---
 
-### 🛠️ Hạng mục 5: Lấy tên Thu ngân & Tiền mặt dự kiến từ Backend trong `src/services/shiftApi.ts`
-
-- **Hiện trạng trên nhánh `main`:**
+#### ✅ Bước 3: Lấy tên Thu ngân đứng ca từ Backend trong `src/services/shiftApi.ts`
+- **Hiện trạng trên `main`:**
   - Trong `src/services/shiftApi.ts` (dòng 217–222), hàm `mapBackendShift` đang gán tên thu ngân theo user đang đăng nhập trên trình duyệt (`user?.fullName || 'Thu ngân'`).
 - **Cách cập nhật trong `src/services/shiftApi.ts`:**
   - Vì `CaLamViecResponse` từ Backend nay đã trả về `maThuNgan`, `tenThuNgan`, `tienMatDuKien`, `chenhLech`, hãy ưu tiên đọc trực tiếp từ `raw`:
@@ -241,9 +142,8 @@ Qua đọc mã nguồn nhánh **`main`** hiện tại của `koithe-pos`, các p
 
 ---
 
-### 🛠️ Hạng mục 6: Bỏ gán cứng `shiftId = 1` khi chưa mở ca trong `src/services/orderApi.ts`
-
-- **Hiện trạng trên nhánh `main`:**
+#### ✅ Bước 4: Bỏ gán cứng `shiftId = 1` khi chưa mở ca trong `src/services/orderApi.ts`
+- **Hiện trạng trên `main`:**
   - Tại `src/services/orderApi.ts` (dòng 44–46), khi không có ca nào đang mở, code đang gán dự phòng:
     ```ts
     if (!shiftId || shiftId <= 0) {
