@@ -17,6 +17,12 @@ import com.milktea.order.entity.*;
 import com.milktea.order.mapper.*;
 import com.milktea.order.repository.*;
 import com.milktea.order.service.*;
+import com.milktea.promotion.entity.ChuongTrinhKhuyenMai;
+import com.milktea.promotion.entity.KhuyenMaiHoaDon;
+import com.milktea.promotion.entity.KhuyenMaiVoucher;
+import com.milktea.promotion.entity.LoaiGiamGia;
+import com.milktea.promotion.repository.KhuyenMaiHoaDonRepository;
+import com.milktea.promotion.repository.KhuyenMaiVoucherRepository;
 import com.milktea.security.UserPrincipal;
 import com.milktea.user.entity.NguoiDung;
 import com.milktea.user.repository.NguoiDungRepository;
@@ -64,13 +70,16 @@ public class OrderServiceImpl implements OrderService {
     private final OrderMapper orderMapper;
     private final OrderItemMapper itemMapper;
     private final OrderToppingMapper toppingMapper;
+    private final KhuyenMaiHoaDonRepository invoicePromotions;
+    private final KhuyenMaiVoucherRepository vouchers;
 
     public OrderServiceImpl(DonHangRepository orders, ChiTietDonHangRepository orderItems,
             ToppingDonHangRepository orderToppings, GioHangRepository carts, ChiTietGioHangRepository cartItems,
             ToppingGioHangRepository cartToppings, BienTheSanPhamRepository variants, ToppingRepository toppings,
             NguoiDungRepository users, KhachHangRepository customers, CaLamViecRepository shifts, BanRepository tables,
             OrderNumberGenerator numbers, OrderMapper orderMapper, OrderItemMapper itemMapper,
-            OrderToppingMapper toppingMapper) {
+            OrderToppingMapper toppingMapper, KhuyenMaiHoaDonRepository invoicePromotions,
+            KhuyenMaiVoucherRepository vouchers) {
         this.orders = orders;
         this.orderItems = orderItems;
         this.orderToppings = orderToppings;
@@ -87,28 +96,25 @@ public class OrderServiceImpl implements OrderService {
         this.orderMapper = orderMapper;
         this.itemMapper = itemMapper;
         this.toppingMapper = toppingMapper;
+        this.invoicePromotions = invoicePromotions;
+        this.vouchers = vouchers;
     }
 
     @Override
     @Transactional
     public OrderResponse create(CreateOrderRequest request, UserPrincipal principal) {
-        // TODO: [Partner] When voucher application is added to order requests, validate
-        // it through the promotion boundary
-        // and decide which voucher/discount values must be snapshotted on the order for
-        // audit and historical stability.
         validateOrderType(request.serviceType(), request.channel(), request.tableId());
         validateDeliveryDetails(request);
         KhachHang customer = resolveCustomer(principal, request.customerId(), true);
         GioHang cart = null;
         if (request.cartToken() != null && !request.cartToken().isBlank()) {
-            cart = carts.findFirstByTokenPhienAndDeletedAtIsNull(request.cartToken())
-                    .orElseThrow(() -> error(HttpStatus.NOT_FOUND, "Không tìm thấy giỏ hàng"));
-        } else if (customer != null) {
-            cart = carts.findFirstByKhachHangIdAndDeletedAtIsNull(customer.getId())
-                    .orElseThrow(() -> error(HttpStatus.BAD_REQUEST, "Giỏ hàng đang trống"));
+            cart = carts.findFirstByTokenPhienAndDeletedAtIsNull(request.cartToken()).orElse(null);
+        }
+        if (cart == null && customer != null) {
+            cart = carts.findFirstByKhachHangIdAndDeletedAtIsNull(customer.getId()).orElse(null);
         }
         if (cart == null)
-            throw error(HttpStatus.BAD_REQUEST, "Cần token giỏ hàng hoặc khách hàng hợp lệ");
+            throw error(HttpStatus.BAD_REQUEST, "Không tìm thấy giỏ hàng hoặc giỏ hàng đã được thanh toán");
         List<ChiTietGioHang> entries = cartItems.findAllByGioHangIdAndDeletedAtIsNullOrderById(cart.getId());
         if (entries.isEmpty())
             throw error(HttpStatus.BAD_REQUEST, "Không thể tạo đơn từ giỏ hàng rỗng");
@@ -128,7 +134,28 @@ public class OrderServiceImpl implements OrderService {
                     chosen.stream().map(t -> new OrderToppingRequest(t.getTopping().getId(), t.getSoLuong()))
                             .toList()));
         }
-        applyTotals(order, total);
+
+        // 1. Khuyến mãi hóa đơn tự động
+        BigDecimal invoiceDiscount = calculateInvoiceDiscount(total);
+        BigDecimal remainingAfterInvoice = total.subtract(invoiceDiscount).max(BigDecimal.ZERO);
+
+        // 2. Khuyến mãi voucher (nếu khách nhập mã)
+        KhuyenMaiVoucher voucher = null;
+        BigDecimal voucherDiscount = BigDecimal.ZERO;
+        if (request.voucherCode() != null && !request.voucherCode().isBlank()) {
+            String code = request.voucherCode().trim().toUpperCase();
+            voucher = vouchers.findByMaCodeIgnoreCaseAndDeletedAtIsNull(code)
+                    .orElseThrow(() -> error(HttpStatus.NOT_FOUND, "Không tìm thấy voucher: " + code));
+            voucherDiscount = calculateVoucherDiscount(voucher, total, remainingAfterInvoice);
+            int updated = vouchers.tangSoLuotDaDungAtomic(voucher.getId());
+            if (updated == 0) {
+                throw error(HttpStatus.BAD_REQUEST, "Voucher đã hết lượt sử dụng");
+            }
+        }
+
+        order.setVoucher(voucher);
+        BigDecimal totalDiscount = invoiceDiscount.add(voucherDiscount).min(total);
+        applyTotals(order, total, totalDiscount);
         DonHang saved = orders.save(order);
         for (ChiTietGioHang entry : entries) {
             entry.markDeleted();
@@ -158,7 +185,8 @@ public class OrderServiceImpl implements OrderService {
         for (PosOrderItemRequest item : request.items())
             total = total.add(addSnapshotLine(order, item.variantId(), item.quantity(),
                     item.sugarLevel(), item.iceLevel(), item.note(), item.toppings()));
-        applyTotals(order, total);
+        BigDecimal invoiceDiscount = calculateInvoiceDiscount(total);
+        applyTotals(order, total, invoiceDiscount);
         return response(orders.save(order));
     }
 
@@ -298,10 +326,84 @@ public class OrderServiceImpl implements OrderService {
         return line.getThanhTien();
     }
 
-    private void applyTotals(DonHang order, BigDecimal total) {
+    private BigDecimal calculateInvoiceDiscount(BigDecimal total) {
+        if (total == null || total.compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO;
+        }
+        Instant now = Instant.now();
+        List<KhuyenMaiHoaDon> activePromotions = invoicePromotions.findAllActiveWithProgram();
+        BigDecimal maxDiscount = BigDecimal.ZERO;
+
+        for (KhuyenMaiHoaDon km : activePromotions) {
+            ChuongTrinhKhuyenMai ct = km.getChuongTrinh();
+            if (ct == null || Boolean.FALSE.equals(ct.getDangHoatDong()) || ct.getDeletedAt() != null) {
+                continue;
+            }
+            if (now.isBefore(ct.getNgayBatDau()) || now.isAfter(ct.getNgayKetThuc())) {
+                continue;
+            }
+            BigDecimal donHangToiThieu = km.getDonHangToiThieu() != null ? km.getDonHangToiThieu() : BigDecimal.ZERO;
+            if (total.compareTo(donHangToiThieu) < 0) {
+                continue;
+            }
+
+            BigDecimal discount = BigDecimal.ZERO;
+            if (km.getLoaiGiamGia() == LoaiGiamGia.TIEN_CO_DINH) {
+                discount = km.getGiaTriGiam();
+            } else if (km.getLoaiGiamGia() == LoaiGiamGia.PHAN_TRAM) {
+                discount = total.multiply(km.getGiaTriGiam())
+                        .divide(BigDecimal.valueOf(100), 2, java.math.RoundingMode.HALF_UP);
+                if (km.getMucGiamToiDa() != null && km.getMucGiamToiDa().compareTo(BigDecimal.ZERO) > 0) {
+                    discount = discount.min(km.getMucGiamToiDa());
+                }
+            }
+            discount = discount.min(total).max(BigDecimal.ZERO);
+            if (discount.compareTo(maxDiscount) > 0) {
+                maxDiscount = discount;
+            }
+        }
+        return maxDiscount;
+    }
+
+    private BigDecimal calculateVoucherDiscount(KhuyenMaiVoucher voucher, BigDecimal orderTotal, BigDecimal baseAmount) {
+        ChuongTrinhKhuyenMai chuongTrinh = voucher.getChuongTrinh();
+        if (chuongTrinh == null || Boolean.FALSE.equals(chuongTrinh.getDangHoatDong()) || chuongTrinh.getDeletedAt() != null) {
+            throw error(HttpStatus.BAD_REQUEST, "Chương trình khuyến mãi của voucher đang không hoạt động");
+        }
+        Instant now = Instant.now();
+        if (now.isBefore(chuongTrinh.getNgayBatDau())) {
+            throw error(HttpStatus.BAD_REQUEST, "Chương trình khuyến mãi chưa bắt đầu");
+        }
+        if (now.isAfter(chuongTrinh.getNgayKetThuc())) {
+            throw error(HttpStatus.BAD_REQUEST, "Chương trình khuyến mãi đã kết thúc");
+        }
+        if (voucher.getGioiHanSuDung() != null && voucher.getSoLuotDaDung() >= voucher.getGioiHanSuDung()) {
+            throw error(HttpStatus.BAD_REQUEST, "Voucher đã hết lượt sử dụng");
+        }
+        BigDecimal donHangToiThieu = voucher.getDonHangToiThieu() != null ? voucher.getDonHangToiThieu() : BigDecimal.ZERO;
+        if (orderTotal.compareTo(donHangToiThieu) < 0) {
+            throw error(HttpStatus.BAD_REQUEST,
+                    String.format("Đơn hàng chưa đạt giá trị tối thiểu (%,.0f đ)", donHangToiThieu));
+        }
+
+        BigDecimal discount = BigDecimal.ZERO;
+        if (voucher.getLoaiGiamGia() == LoaiGiamGia.TIEN_CO_DINH) {
+            discount = voucher.getGiaTriGiam();
+        } else if (voucher.getLoaiGiamGia() == LoaiGiamGia.PHAN_TRAM) {
+            discount = baseAmount.multiply(voucher.getGiaTriGiam())
+                    .divide(BigDecimal.valueOf(100), 2, java.math.RoundingMode.HALF_UP);
+            if (voucher.getMucGiamToiDa() != null && voucher.getMucGiamToiDa().compareTo(BigDecimal.ZERO) > 0) {
+                discount = discount.min(voucher.getMucGiamToiDa());
+            }
+        }
+        return discount.min(baseAmount).max(BigDecimal.ZERO);
+    }
+
+    private void applyTotals(DonHang order, BigDecimal total, BigDecimal discount) {
         order.setTongTienHang(total);
-        order.setSoTienGiam(BigDecimal.ZERO);
-        order.setTongTienThanhToan(total);
+        BigDecimal actualDiscount = discount != null ? discount.min(total).max(BigDecimal.ZERO) : BigDecimal.ZERO;
+        order.setSoTienGiam(actualDiscount);
+        order.setTongTienThanhToan(total.subtract(actualDiscount).max(BigDecimal.ZERO));
     }
 
     private void transition(DonHang order, String to) {
@@ -332,8 +434,14 @@ public class OrderServiceImpl implements OrderService {
         if ("HOAN_THANH".equals(to) && order.getId() != null) {
             orders.markPendingCashPaymentSuccess(order.getId());
         }
-        if ("DA_HUY".equals(to) && order.isTonKhoDaTru())
-            changeInventory(order, true);
+        if ("DA_HUY".equals(to)) {
+            if (order.isTonKhoDaTru()) {
+                changeInventory(order, true);
+            }
+            if (order.getVoucher() != null) {
+                vouchers.giamSoLuotDaDungAtomic(order.getVoucher().getId());
+            }
+        }
         order.setTrangThai(to);
     }
 
