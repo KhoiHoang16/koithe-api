@@ -15,6 +15,12 @@ import com.milktea.order.entity.*;
 import com.milktea.order.mapper.*;
 import com.milktea.order.repository.*;
 import com.milktea.order.service.OrderNumberGenerator;
+import com.milktea.promotion.entity.ChuongTrinhKhuyenMai;
+import com.milktea.promotion.entity.KhuyenMaiHoaDon;
+import com.milktea.promotion.entity.KhuyenMaiVoucher;
+import com.milktea.promotion.entity.LoaiGiamGia;
+import com.milktea.promotion.repository.KhuyenMaiHoaDonRepository;
+import com.milktea.promotion.repository.KhuyenMaiVoucherRepository;
 import com.milktea.security.UserPrincipal;
 import com.milktea.shift.entity.CaLamViec;
 import com.milktea.shift.repository.CaLamViecRepository;
@@ -23,6 +29,8 @@ import com.milktea.table.repository.BanRepository;
 import com.milktea.user.entity.NguoiDung;
 import com.milktea.user.repository.NguoiDungRepository;
 import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.BeforeEach;
@@ -45,14 +53,18 @@ class OrderServiceImplTest {
     OrderMapper orderMapper = mock(OrderMapper.class);
     OrderItemMapper itemMapper = mock(OrderItemMapper.class);
     OrderToppingMapper toppingMapper = mock(OrderToppingMapper.class);
+    KhuyenMaiHoaDonRepository invoicePromotions = mock(KhuyenMaiHoaDonRepository.class);
+    KhuyenMaiVoucherRepository vouchers = mock(KhuyenMaiVoucherRepository.class);
     OrderServiceImpl service = new OrderServiceImpl(orders, orderItems, orderToppings, carts, cartItems, cartToppings,
-            variants, toppings, users, customers, shifts, tables, numbers, orderMapper, itemMapper, toppingMapper);
+            variants, toppings, users, customers, shifts, tables, numbers, orderMapper, itemMapper, toppingMapper,
+            invoicePromotions, vouchers);
     List<ChiTietDonHang> savedItems = new ArrayList<>();
     List<ToppingDonHang> savedToppings = new ArrayList<>();
     AtomicLong nextId = new AtomicLong(100);
 
     @BeforeEach void setUp() {
         savedItems.clear(); savedToppings.clear();
+        when(invoicePromotions.findAllActiveWithProgram()).thenReturn(Collections.emptyList());
         NguoiDung defaultCashier = new NguoiDung(); defaultCashier.setId(1L); defaultCashier.setDangHoatDong(true);
         CaLamViec defaultShift = new CaLamViec(); defaultShift.setId(4L); defaultShift.setThuNgan(defaultCashier); defaultShift.setTrangThai("DANG_MO");
         when(shifts.findFirstByTrangThaiAndDeletedAtIsNullOrderByThoiGianBatDauDesc("DANG_MO")).thenReturn(Optional.of(defaultShift));
@@ -103,6 +115,72 @@ class OrderServiceImplTest {
         variant.setGiaBan(new BigDecimal("50000")); topping.setGiaBan(new BigDecimal("10000"));
         assertEquals(new BigDecimal("40000"), savedItems.getFirst().getDonGia());
         assertNotNull(cart.getDeletedAt());
+    }
+
+    @Test void appliesInvoiceDiscountAutomatically() {
+        String token = UUID.randomUUID().toString();
+        GioHang cart = new GioHang(); cart.setId(1L); cart.setTokenPhien(token);
+        BienTheSanPham variant = variant(5L, "L", "100000", "10");
+        ChiTietGioHang cartLine = new ChiTietGioHang(); cartLine.setId(10L); cartLine.setGioHang(cart); cartLine.setBienThe(variant); cartLine.setSoLuong(2);
+        when(carts.findFirstByTokenPhienAndDeletedAtIsNull(token)).thenReturn(Optional.of(cart));
+        when(cartItems.findAllByGioHangIdAndDeletedAtIsNullOrderById(1L)).thenReturn(List.of(cartLine));
+        when(cartToppings.findAllByChiTietGioHangIdAndDeletedAtIsNull(10L)).thenReturn(List.of());
+        when(variants.findByIdAndDeletedAtIsNull(5L)).thenReturn(Optional.of(variant));
+
+        ChuongTrinhKhuyenMai ct = new ChuongTrinhKhuyenMai();
+        ct.setId(2L); ct.setDangHoatDong(true);
+        ct.setNgayBatDau(Instant.now().minus(1, ChronoUnit.DAYS));
+        ct.setNgayKetThuc(Instant.now().plus(1, ChronoUnit.DAYS));
+
+        KhuyenMaiHoaDon km = new KhuyenMaiHoaDon();
+        km.setId(1L); km.setChuongTrinh(ct);
+        km.setDonHangToiThieu(new BigDecimal("200000"));
+        km.setLoaiGiamGia(LoaiGiamGia.PHAN_TRAM);
+        km.setGiaTriGiam(new BigDecimal("15"));
+        km.setMucGiamToiDa(new BigDecimal("50000"));
+
+        when(invoicePromotions.findAllActiveWithProgram()).thenReturn(List.of(km));
+
+        OrderResponse response = service.create(new CreateOrderRequest(token, null, "MANG_VE", "WEBSITE", null,
+                null, null, null), null);
+
+        assertEquals(new BigDecimal("200000"), response.merchandiseTotal());
+        assertEquals(new BigDecimal("30000.00"), response.discount());
+        assertEquals(new BigDecimal("170000.00"), response.payableTotal());
+    }
+
+    @Test void appliesVoucherDiscountAndIncrementsUsage() {
+        String token = UUID.randomUUID().toString();
+        GioHang cart = new GioHang(); cart.setId(1L); cart.setTokenPhien(token);
+        BienTheSanPham variant = variant(5L, "M", "50000", "10");
+        ChiTietGioHang cartLine = new ChiTietGioHang(); cartLine.setId(10L); cartLine.setGioHang(cart); cartLine.setBienThe(variant); cartLine.setSoLuong(1);
+        when(carts.findFirstByTokenPhienAndDeletedAtIsNull(token)).thenReturn(Optional.of(cart));
+        when(cartItems.findAllByGioHangIdAndDeletedAtIsNullOrderById(1L)).thenReturn(List.of(cartLine));
+        when(cartToppings.findAllByChiTietGioHangIdAndDeletedAtIsNull(10L)).thenReturn(List.of());
+        when(variants.findByIdAndDeletedAtIsNull(5L)).thenReturn(Optional.of(variant));
+
+        ChuongTrinhKhuyenMai ct = new ChuongTrinhKhuyenMai();
+        ct.setId(1L); ct.setDangHoatDong(true);
+        ct.setNgayBatDau(Instant.now().minus(1, ChronoUnit.DAYS));
+        ct.setNgayKetThuc(Instant.now().plus(1, ChronoUnit.DAYS));
+
+        KhuyenMaiVoucher v = new KhuyenMaiVoucher();
+        v.setId(99L); v.setMaCode("GIAM20K"); v.setChuongTrinh(ct);
+        v.setLoaiGiamGia(LoaiGiamGia.TIEN_CO_DINH);
+        v.setGiaTriGiam(new BigDecimal("20000"));
+        v.setDonHangToiThieu(new BigDecimal("30000"));
+        v.setGioiHanSuDung(100); v.setSoLuotDaDung(5);
+
+        when(vouchers.findByMaCodeIgnoreCaseAndDeletedAtIsNull("GIAM20K")).thenReturn(Optional.of(v));
+        when(vouchers.tangSoLuotDaDungAtomic(99L)).thenReturn(1);
+
+        OrderResponse response = service.create(new CreateOrderRequest(token, null, "MANG_VE", "WEBSITE", null,
+                null, null, null, "GIAM20K"), null);
+
+        assertEquals(new BigDecimal("50000"), response.merchandiseTotal());
+        assertEquals(new BigDecimal("20000"), response.discount());
+        assertEquals(new BigDecimal("30000"), response.payableTotal());
+        verify(vouchers).tangSoLuotDaDungAtomic(99L);
     }
 
     @Test void rejectsWebOrderWhenNoShiftIsOpen() {

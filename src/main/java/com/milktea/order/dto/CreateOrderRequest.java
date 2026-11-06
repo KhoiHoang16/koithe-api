@@ -10,4 +10,12 @@ public record CreateOrderRequest(String cartToken, @Positive Long customerId,
         @Positive Long tableId,
         @Size(max = 255) String tenNguoiNhan,
         @Size(max = 30) String soDienThoaiNguoiNhan,
-        @Size(max = 1000) String diaChiGiaoHang) {}
+        @Size(max = 1000) String diaChiGiaoHang,
+        @Size(max = 50) String voucherCode) {
+
+    public CreateOrderRequest(String cartToken, Long customerId, String serviceType, String channel, Long tableId,
+            String tenNguoiNhan, String soDienThoaiNguoiNhan, String diaChiGiaoHang) {
+        this(cartToken, customerId, serviceType, channel, tableId, tenNguoiNhan, soDienThoaiNguoiNhan, diaChiGiaoHang,
+                null);
+    }
+}
