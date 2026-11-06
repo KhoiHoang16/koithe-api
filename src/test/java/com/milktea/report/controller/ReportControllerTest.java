@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.milktea.common.response.PageResponse;
 import com.milktea.report.dto.*;
 import com.milktea.report.service.ReportService;
 import com.milktea.security.JwtFilter;
@@ -77,5 +78,73 @@ class ReportControllerTest {
                 .andExpect(jsonPath("$.data.topSanPhamBanChay[0].tenSanPham").value("Trà sữa trân châu"));
 
         verify(reportService).getSummary(eq(from), eq(to), eq(5));
+    }
+
+    @Test
+    @DisplayName("GET /api/reports/revenue-trend - Trả về danh sách xu hướng doanh thu thành công")
+    void revenueTrend_returnsTrendList() throws Exception {
+        List<RevenueTrendResponse> mockTrend = List.of(
+                new RevenueTrendResponse("2026-01", "Tháng 01/2026", new BigDecimal("120000000.00"), 1500L, 2200L),
+                new RevenueTrendResponse("2026-02", "Tháng 02/2026", new BigDecimal("135000000.00"), 1650L, 2400L)
+        );
+
+        when(reportService.getRevenueTrend(eq(2026), eq(ReportInterval.MONTH)))
+                .thenReturn(mockTrend);
+
+        mockMvc.perform(get("/api/reports/revenue-trend")
+                        .param("year", "2026")
+                        .param("groupBy", "MONTH"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data[0].periodKey").value("2026-01"))
+                .andExpect(jsonPath("$.data[0].label").value("Tháng 01/2026"))
+                .andExpect(jsonPath("$.data[0].tongDoanhThu").value(120000000.00))
+                .andExpect(jsonPath("$.data[0].tongSoDon").value(1500))
+                .andExpect(jsonPath("$.data[0].tongSoLy").value(2200));
+
+        verify(reportService).getRevenueTrend(eq(2026), eq(ReportInterval.MONTH));
+    }
+
+    @Test
+    @DisplayName("GET /api/reports/product-performance - Trả về phân trang hiệu suất sản phẩm thành công")
+    void productPerformance_returnsPagedProducts() throws Exception {
+        ProductPerformanceResponse mockProduct = new ProductPerformanceResponse(
+                10L,
+                "Lục Trà Macchiato",
+                "Macchiato",
+                "https://image.url/macchiato.png",
+                1200L,
+                new BigDecimal("60000000.00"),
+                18.5,
+                List.of(new ProductVariantBreakdown(101L, "M", 700L, new BigDecimal("35000000.00")))
+        );
+
+        PageResponse<ProductPerformanceResponse> mockPage = new PageResponse<>(
+                List.of(mockProduct),
+                0,
+                10,
+                1L,
+                1
+        );
+
+        when(reportService.getProductPerformance(eq(2026), eq(10), isNull(), isNull(), eq("REVENUE"), eq(0), eq(10)))
+                .thenReturn(mockPage);
+
+        mockMvc.perform(get("/api/reports/product-performance")
+                        .param("year", "2026")
+                        .param("month", "10")
+                        .param("sortBy", "REVENUE")
+                        .param("page", "0")
+                        .param("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.content[0].sanPhamId").value(10))
+                .andExpect(jsonPath("$.data.content[0].tenSanPham").value("Lục Trà Macchiato"))
+                .andExpect(jsonPath("$.data.content[0].tongSoLyDaBan").value(1200))
+                .andExpect(jsonPath("$.data.content[0].tongDoanhThu").value(60000000.00))
+                .andExpect(jsonPath("$.data.content[0].tyTrongDoanhThu").value(18.5))
+                .andExpect(jsonPath("$.data.content[0].chiTietBienThe[0].kichCo").value("M"));
+
+        verify(reportService).getProductPerformance(eq(2026), eq(10), isNull(), isNull(), eq("REVENUE"), eq(0), eq(10));
     }
 }

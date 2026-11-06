@@ -1,5 +1,6 @@
 package com.milktea.report.service.impl;
 
+import com.milktea.common.response.PageResponse;
 import com.milktea.report.dto.*;
 import com.milktea.report.repository.ReportRepository;
 import com.milktea.report.service.ReportService;
@@ -10,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.sql.Date;
 import java.time.*;
 import java.util.*;
@@ -26,6 +28,10 @@ public class ReportServiceImpl implements ReportService {
 
     public ReportServiceImpl(ReportRepository reportRepository) {
         this.reportRepository = reportRepository;
+    }
+
+    private record TrendAccumulator(BigDecimal revenue, Long orders, Long cups) {
+        static final TrendAccumulator EMPTY = new TrendAccumulator(BigDecimal.ZERO, 0L, 0L);
     }
 
     @Override
@@ -140,6 +146,193 @@ public class ReportServiceImpl implements ReportService {
             channelMetrics,
             paymentMetrics,
             topProducts
+        );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<RevenueTrendResponse> getRevenueTrend(
+            Integer year,
+            ReportInterval interval) {
+        ReportInterval chosenInterval = (interval != null) ? interval : ReportInterval.MONTH;
+        int targetYear = (year != null) ? year : LocalDate.now(VN_ZONE).getYear();
+
+        LocalDate startDate;
+        LocalDate endDate;
+
+        if (chosenInterval == ReportInterval.YEAR) {
+            startDate = LocalDate.of(targetYear - 4, 1, 1);
+            endDate = LocalDate.of(targetYear, 12, 31);
+        } else {
+            startDate = LocalDate.of(targetYear, 1, 1);
+            endDate = LocalDate.of(targetYear, 12, 31);
+        }
+
+        Instant fromInstant = startDate.atStartOfDay(VN_ZONE).toInstant();
+        Instant toInstant = endDate.atTime(LocalTime.MAX).atZone(VN_ZONE).toInstant();
+
+        String sqlFormat = switch (chosenInterval) {
+            case MONTH -> "YYYY-MM";
+            case QUARTER -> "YYYY-\"Q\"Q";
+            case YEAR -> "YYYY";
+        };
+
+        List<Object[]> rows = reportRepository.revenueTrend(fromInstant, toInstant, EXCLUDED_STATUSES, sqlFormat);
+
+        Map<String, TrendAccumulator> dbMap = new HashMap<>();
+        for (Object[] row : rows) {
+            String key = row[0] != null ? row[0].toString() : "";
+            BigDecimal rev = row[1] != null ? (BigDecimal) row[1] : BigDecimal.ZERO;
+            Long orders = row[2] != null ? ((Number) row[2]).longValue() : 0L;
+            Long cups = row[3] != null ? ((Number) row[3]).longValue() : 0L;
+            dbMap.put(key, new TrendAccumulator(rev, orders, cups));
+        }
+
+        List<RevenueTrendResponse> result = new ArrayList<>();
+        switch (chosenInterval) {
+            case MONTH -> {
+                YearMonth startYm = YearMonth.from(startDate);
+                YearMonth endYm = YearMonth.from(endDate);
+                for (YearMonth ym = startYm; !ym.isAfter(endYm); ym = ym.plusMonths(1)) {
+                    String key = ym.toString();
+                    String label = String.format("Tháng %02d/%d", ym.getMonthValue(), ym.getYear());
+                    TrendAccumulator val = dbMap.getOrDefault(key, TrendAccumulator.EMPTY);
+                    result.add(new RevenueTrendResponse(key, label, val.revenue, val.orders, val.cups));
+                }
+            }
+            case QUARTER -> {
+                for (int q = 1; q <= 4; q++) {
+                    String key = String.format("%d-Q%d", targetYear, q);
+                    String label = String.format("Quý %d/%d", q, targetYear);
+                    TrendAccumulator val = dbMap.getOrDefault(key, TrendAccumulator.EMPTY);
+                    result.add(new RevenueTrendResponse(key, label, val.revenue, val.orders, val.cups));
+                }
+            }
+            case YEAR -> {
+                for (int y = startDate.getYear(); y <= endDate.getYear(); y++) {
+                    String key = String.valueOf(y);
+                    String label = "Năm " + y;
+                    TrendAccumulator val = dbMap.getOrDefault(key, TrendAccumulator.EMPTY);
+                    result.add(new RevenueTrendResponse(key, label, val.revenue, val.orders, val.cups));
+                }
+            }
+        }
+
+        return result;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<ProductPerformanceResponse> getProductPerformance(
+            Integer year,
+            Integer month,
+            Integer quarter,
+            Long categoryId,
+            String sortBy,
+            int page,
+            int size) {
+        int targetYear = (year != null) ? year : LocalDate.now(VN_ZONE).getYear();
+        LocalDate startDate;
+        LocalDate endDate;
+
+        if (month != null && month >= 1 && month <= 12) {
+            YearMonth ym = YearMonth.of(targetYear, month);
+            startDate = ym.atDay(1);
+            endDate = ym.atEndOfMonth();
+        } else if (quarter != null && quarter >= 1 && quarter <= 4) {
+            int firstMonth = (quarter - 1) * 3 + 1;
+            startDate = LocalDate.of(targetYear, firstMonth, 1);
+            endDate = YearMonth.of(targetYear, firstMonth + 2).atEndOfMonth();
+        } else {
+            // Mặc định cả năm
+            startDate = LocalDate.of(targetYear, 1, 1);
+            endDate = LocalDate.of(targetYear, 12, 31);
+        }
+
+        Instant fromInstant = startDate.atStartOfDay(VN_ZONE).toInstant();
+        Instant toInstant = endDate.atTime(LocalTime.MAX).atZone(VN_ZONE).toInstant();
+
+        // 1. Tính tổng doanh thu kỳ để tính tỷ trọng %
+        List<Object[]> revenueRows = reportRepository.sumRevenueAndCountOrders(fromInstant, toInstant, EXCLUDED_STATUSES);
+        BigDecimal totalPeriodRevenue = BigDecimal.ZERO;
+        if (!revenueRows.isEmpty() && revenueRows.get(0) != null && revenueRows.get(0)[0] != null) {
+            totalPeriodRevenue = (BigDecimal) revenueRows.get(0)[0];
+        }
+
+        // 2. Query trang sản phẩm
+        int pageIndex = Math.max(page, 0);
+        int pageSize = size > 0 ? size : 10;
+        PageRequest pageRequest = PageRequest.of(pageIndex, pageSize);
+
+        org.springframework.data.domain.Page<Object[]> pagedRows;
+        if ("QUANTITY".equalsIgnoreCase(sortBy)) {
+            pagedRows = reportRepository.findProductPerformanceByQuantity(fromInstant, toInstant, EXCLUDED_STATUSES, categoryId, pageRequest);
+        } else {
+            pagedRows = reportRepository.findProductPerformanceByRevenue(fromInstant, toInstant, EXCLUDED_STATUSES, categoryId, pageRequest);
+        }
+
+        if (pagedRows.isEmpty()) {
+            return new PageResponse<>(Collections.emptyList(), pageIndex, pageSize, 0L, 0);
+        }
+
+        // 3. Gom danh sách ID sản phẩm trong trang hiện tại để query biến thể
+        List<Long> productIds = new ArrayList<>();
+        for (Object[] row : pagedRows.getContent()) {
+            productIds.add(((Number) row[0]).longValue());
+        }
+
+        // 4. Query chi tiết biến thể theo danh sách productIds
+        Map<Long, List<ProductVariantBreakdown>> variantMap = new HashMap<>();
+        if (!productIds.isEmpty()) {
+            List<Object[]> variantRows = reportRepository.findVariantBreakdownByProductIds(fromInstant, toInstant, EXCLUDED_STATUSES, productIds);
+            for (Object[] vRow : variantRows) {
+                Long pId = ((Number) vRow[0]).longValue();
+                Long bId = ((Number) vRow[1]).longValue();
+                String kichCo = (String) vRow[2];
+                Long qty = ((Number) vRow[3]).longValue();
+                BigDecimal amount = (BigDecimal) vRow[4];
+                variantMap.computeIfAbsent(pId, k -> new ArrayList<>())
+                          .add(new ProductVariantBreakdown(bId, kichCo, qty, amount));
+            }
+        }
+
+        // 5. Build DTO Response
+        List<ProductPerformanceResponse> content = new ArrayList<>();
+        for (Object[] row : pagedRows.getContent()) {
+            Long prodId = ((Number) row[0]).longValue();
+            String prodName = (String) row[1];
+            String catName = (String) row[2];
+            String imgUrl = (String) row[3];
+            Long totalCups = ((Number) row[4]).longValue();
+            BigDecimal prodRevenue = (BigDecimal) row[5];
+
+            Double share = 0.0;
+            if (totalPeriodRevenue.compareTo(BigDecimal.ZERO) > 0 && prodRevenue != null) {
+                share = prodRevenue.multiply(BigDecimal.valueOf(100))
+                                   .divide(totalPeriodRevenue, 2, RoundingMode.HALF_UP)
+                                   .doubleValue();
+            }
+
+            List<ProductVariantBreakdown> variants = variantMap.getOrDefault(prodId, Collections.emptyList());
+
+            content.add(new ProductPerformanceResponse(
+                prodId,
+                prodName,
+                catName,
+                imgUrl,
+                totalCups,
+                prodRevenue,
+                share,
+                variants
+            ));
+        }
+
+        return new PageResponse<>(
+            content,
+            pagedRows.getNumber(),
+            pagedRows.getSize(),
+            pagedRows.getTotalElements(),
+            pagedRows.getTotalPages()
         );
     }
 }
